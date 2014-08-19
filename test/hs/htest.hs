@@ -83,6 +83,7 @@ import Test.Ganeti.THH.Types
 import Test.Ganeti.Types
 import Test.Ganeti.Utils
 import Test.Ganeti.Utils.MultiMap
+import Test.Ganeti.Utils.Queue
 import Test.Ganeti.Utils.Statistics
 import Test.Ganeti.WConfd.TempRes
 
@@ -153,6 +154,7 @@ allTests =
   , testTypes
   , testUtils
   , testUtils_MultiMap
+  , testUtils_Queue
   , testUtils_Statistics
   , testWConfd_TempRes
   ]

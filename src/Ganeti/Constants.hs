@@ -5127,6 +5127,9 @@ dataCollectorLv         = "lv"
 dataCollectorInstStatus :: String
 dataCollectorInstStatus = "inst-status-xen"
 
+dataCollectorParameterInterval :: String
+dataCollectorParameterInterval = "interval"
+
 dataCollectorNames :: FrozenSet String
 dataCollectorNames =
   ConstantUtils.mkSet [ dataCollectorCPULoad
