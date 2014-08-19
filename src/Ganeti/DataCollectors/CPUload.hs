@@ -90,12 +90,8 @@ dcKind = DCKPerf
 -- | The data exported by the data collector, taken from the default location.
 dcReport :: Maybe CollectorData -> IO DCReport
 dcReport colData =
-  let cpuLoadData =
-        case colData of
-          Nothing -> Seq.empty
-          Just colData' ->
-            case colData' of
-              CPULoadData v -> v
+  let extractColData (CPULoadData v) = v
+      cpuLoadData = maybe Seq.empty extractColData colData
   in buildDCReport cpuLoadData
 
 -- | Data stored by the collector in mond's memory.
