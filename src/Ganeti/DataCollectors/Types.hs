@@ -40,6 +40,7 @@ module Ganeti.DataCollectors.Types
   , getCategoryName
   , ReportBuilder(..)
   , DataCollector(..)
+  , Timestamp
   ) where
 
 import Data.Char
@@ -129,8 +130,11 @@ instance JSON DCVersion where
     then Ok DCVerBuiltin else Ok . DCVersion $ fromJSString s
   readJSON v = fail $ "Invalid JSON value " ++ show v ++ " for type DCVersion"
 
+-- | Number of seconds since the Unix epoch.
+type Timestamp = Integer
+
 -- | Type for the value field of the above map.
-data CollectorData = CPULoadData (Seq.Seq (Integer, [Int]))
+data CollectorData = CPULoadData (Seq.Seq (Timestamp, [Int]))
 
 -- | Type for the map storing the data of the statefull DataCollectors.
 type CollectorMap = Map.Map String CollectorData

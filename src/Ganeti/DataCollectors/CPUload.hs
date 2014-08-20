@@ -97,8 +97,9 @@ dcReport colData =
             case colData' of
               CPULoadData v -> v
   in buildDCReport cpuLoadData
+
 -- | Data stored by the collector in mond's memory.
-type Buffer = Seq.Seq (Integer, [Int])
+type Buffer = Seq.Seq (Timestamp, [Int])
 
 -- | Compute the load from a CPU.
 computeLoad :: CPUstat -> Int
@@ -108,7 +109,7 @@ computeLoad cpuData =
   + csSteal cpuData + csGuest cpuData + csGuestNice cpuData
 
 -- | Reads and Computes the load for each CPU.
-dcCollectFromFile :: FilePath -> IO (Integer, [Int])
+dcCollectFromFile :: FilePath -> IO (Timestamp, [Int])
 dcCollectFromFile inputFile = do
   contents <-
     ((E.try $ readFile inputFile) :: IO (Either IOError String)) >>=
