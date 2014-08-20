@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 {-| @/proc/stat@ data collector.
 
 -}

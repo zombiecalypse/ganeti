@@ -48,6 +48,7 @@ import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import System.Time (ClockTime(..))
 import Text.JSON
+
 import Ganeti.Constants as C
 import Ganeti.Objects (ConfigData)
 import Ganeti.THH
