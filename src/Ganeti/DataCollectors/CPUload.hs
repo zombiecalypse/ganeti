@@ -152,26 +152,31 @@ dcUpdate mcd = do
   new_v `seq` return $ CPULoadData new_v
 
 -- | Computes the average load for every CPU and the overall from data read
--- from the map.
-computeAverage :: Buffer -> Integer -> Integer -> [Double]
-computeAverage s w ticks =
-  let window = Seq.takeWhileL ((> w) . fst) s
-      go Seq.EmptyL          _                    = []
-      go _                   Seq.EmptyR           = []
-      go (leftmost Seq.:< _) (_ Seq.:> rightmost) = do
-        let (timestampL, listL) = leftmost
-            (timestampR, listR) = rightmost
-            work = zipWith (-) listL listR
-            overall = (timestampL - timestampR) * ticks
-        map (\x -> fromIntegral x / fromIntegral overall) work
-  in go (Seq.viewl window) (Seq.viewr window)
+-- from the map. Returns Bad if there are not enough values to compute it.
+computeAverage :: Buffer -> Integer -> Integer -> DataResponse [Double]
+computeAverage s w ticks = go (Seq.viewl window) (Seq.viewr window)
+  where
+    err = BT.Bad . ErrorMessage
+    window = Seq.takeWhileL ((> w) . fst) s
+    dividedBy x = flip (/) (fromIntegral x) . fromIntegral
+    go Seq.EmptyL          _                    = err "Empty buffer"
+    go _                   Seq.EmptyR           = err "Empty buffer"
+    go (leftmost Seq.:< _) (_ Seq.:> rightmost) = do
+      let (timestampL, listL) = leftmost
+          (timestampR, listR) = rightmost
+          workInWindow = zipWith (-) listL listR
+          overall = (timestampL - timestampR) * ticks
+      if overall > 0
+        then BT.Ok $ map (dividedBy overall) workInWindow
+        else err $ "Time covered by data is not sufficient."
+                 ++ "The window considered is " ++ show w
 
 -- | This function computes the JSON representation of the CPU load.
 buildJsonReport :: Buffer -> IO J.JSValue
 buildJsonReport v = do
   ticks <- getSysVar ClockTick
   let res = computeAverage v windowSize ticks
-  return . J.showJSON $ formatData res
+  return $ BT.genericResult J.showJSON (J.showJSON . formatData) res
 
 -- | This function computes the DCReport for the CPU load.
 buildDCReport :: Buffer -> IO DCReport

@@ -35,12 +35,14 @@ module Ganeti.DataCollectors.Types
   , DCVersion(..)
   , CollectorData(..)
   , CollectorMap
+  , ErrorMessage(..)
   , buildReport
   , mergeStatuses
   , getCategoryName
   , ReportBuilder(..)
   , DataCollector(..)
   , Timestamp
+  , DataResponse
   ) where
 
 import Data.Char
@@ -49,7 +51,9 @@ import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import Text.JSON
 
+import qualified Ganeti.BasicTypes as BT
 import Ganeti.Constants as C
+import qualified Ganeti.JSON as GJ
 import Ganeti.Objects (ConfigData)
 import Ganeti.THH
 import Ganeti.Utils (getCurrentTime)
@@ -204,3 +208,18 @@ data DataCollector = DataCollector
   , dActive   :: Name -> ConfigData -> Bool
                     -- ^ Checks if the collector applies for the cluster.
   }
+
+data ErrorMessage = ErrorMessage { errorString :: String }
+  deriving (Show, Eq, Ord)
+
+instance BT.Error ErrorMessage where
+  strMsg = ErrorMessage
+
+instance JSON ErrorMessage where
+  readJSON s = do
+    container <- readJSON s :: Result (GJ.Container String)
+    message <- GJ.lookupContainer (fail "no error message") "error" container
+    return $ ErrorMessage message
+  showJSON s = showJSON $ GJ.containerFromList [("error", errorString s)]
+
+type DataResponse = BT.GenericResult ErrorMessage
