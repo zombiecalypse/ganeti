@@ -4641,6 +4641,7 @@ statFile = "/proc/stat"
 cpuavgloadBufferSize :: Int
 cpuavgloadBufferSize = 150
 
+-- | Window size for averaging in seconds.
 cpuavgloadWindowSize :: Int
 cpuavgloadWindowSize = 600
 
