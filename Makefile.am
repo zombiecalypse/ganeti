@@ -169,7 +169,8 @@ HS_DIRS = \
 	test/hs/Test/Ganeti/Query \
 	test/hs/Test/Ganeti/THH \
 	test/hs/Test/Ganeti/Utils \
-	test/hs/Test/Ganeti/WConfd
+	test/hs/Test/Ganeti/WConfd \
+	test/hs/Test/Ganeti/Utils
 
 # Haskell directories without the roots (src, test/hs)
 HS_DIRS_NOROOT = $(filter-out src,$(filter-out test/hs,$(HS_DIRS)))
@@ -912,6 +913,7 @@ HS_LIB_SRCS = \
 	src/Ganeti/Utils/MonadPlus.hs \
 	src/Ganeti/Utils/MultiMap.hs \
 	src/Ganeti/Utils/MVarLock.hs \
+	src/Ganeti/Utils/Queue.hs \
 	src/Ganeti/Utils/Random.hs \
 	src/Ganeti/Utils/Statistics.hs \
 	src/Ganeti/Utils/UniStd.hs \
@@ -988,6 +990,7 @@ HS_TEST_SRCS = \
 	test/hs/Test/Ganeti/Types.hs \
 	test/hs/Test/Ganeti/Utils.hs \
 	test/hs/Test/Ganeti/Utils/MultiMap.hs \
+	test/hs/Test/Ganeti/Utils/Queue.hs \
 	test/hs/Test/Ganeti/Utils/Statistics.hs \
 	test/hs/Test/Ganeti/WConfd/TempRes.hs
 
