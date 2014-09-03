@@ -116,35 +116,35 @@ saveConfig fh = hPutStr fh . encodeConfig
 -- * Query functions
 
 -- | Computes the nodes covered by a disk.
-computeDiskNodes :: Disk -> S.Set String
+computeDiskNodes :: Disk -> S.Set Uuid
 computeDiskNodes dsk =
   case diskLogicalId dsk of
-    LIDDrbd8 nodeA nodeB _ _ _ _ -> S.fromList [nodeA, nodeB]
+    LIDDrbd8 nodeA nodeB _ _ _ _ -> S.fromList $ map Uuid [nodeA, nodeB]
     _ -> S.empty
 
 -- | Computes all disk-related nodes of an instance. For non-DRBD,
 -- this will be empty, for DRBD it will contain both the primary and
 -- the secondaries.
-instDiskNodes :: ConfigData -> Instance -> S.Set String
+instDiskNodes :: ConfigData -> Instance -> S.Set Uuid
 instDiskNodes cfg inst =
   case getInstDisksFromObj cfg inst of
     Ok disks -> S.unions $ map computeDiskNodes disks
     Bad _ -> S.empty
 
 -- | Computes all nodes of an instance.
-instNodes :: ConfigData -> Instance -> S.Set String
+instNodes :: ConfigData -> Instance -> S.Set Uuid
 instNodes cfg inst = instPrimaryNode inst `S.insert` instDiskNodes cfg inst
 
 -- | Computes the secondary nodes of an instance. Since this is valid
 -- only for DRBD, we call directly 'instDiskNodes', skipping over the
 -- extra primary insert.
-instSecondaryNodes :: ConfigData -> Instance -> S.Set String
+instSecondaryNodes :: ConfigData -> Instance -> S.Set Uuid
 instSecondaryNodes cfg inst =
   instPrimaryNode inst `S.delete` instDiskNodes cfg inst
 
 -- | Get instances of a given node.
 -- The node is specified through its UUID.
-getNodeInstances :: ConfigData -> String -> ([Instance], [Instance])
+getNodeInstances :: ConfigData -> Uuid -> ([Instance], [Instance])
 getNodeInstances cfg nname =
     let all_inst = M.elems . fromContainer . configInstances $ cfg
         pri_inst = filter ((== nname) . instPrimaryNode) all_inst
@@ -215,10 +215,10 @@ getInstancesIpByLink linkipmap link =
 
 -- | Generic lookup function that converts from a possible abbreviated
 -- name to a full name.
-getItem :: String -> String -> M.Map String a -> ErrorResult a
+getItem :: HasStringRepr b => String -> b -> M.Map b a -> ErrorResult a
 getItem kind name allitems = do
   let lresult = lookupName (M.keys allitems) name
-      err msg = Bad $ OpPrereqError (kind ++ " name " ++ name ++ " " ++ msg)
+      err msg = Bad $ OpPrereqError (kind ++ " name " ++ toStringRepr name ++ " " ++ msg)
                         ECodeNoEnt
   fullname <- case lrMatchPriority lresult of
                 PartialMatch -> Ok $ lrContent lresult
@@ -240,15 +240,16 @@ getNode cfg name =
                 in getItem "Node" name by_name
 
 -- | Looks up an instance by name or uuid.
-getInstance :: ConfigData -> String -> ErrorResult Instance
-getInstance cfg name =
+getInstance :: ConfigData -> Either Uuid String -> ErrorResult Instance
+getInstance cfg nameOrUuid =
   let instances = fromContainer (configInstances cfg)
-  in case getItem "Instance" name instances of
+  in case nameOrUuid of
+    Left uuid -> case getItem "Instance" uuid instances of
        -- if not found by uuid, we need to look it up by name
        Ok inst -> Ok inst
-       Bad _ -> let by_name = M.mapKeys
-                              (instName . (M.!) instances) instances
-                in getItem "Instance" name by_name
+       Bad _ -> fail "Uuid not found: " ++ uuidString uuid
+    Right name -> let by_name = M.mapKeys (instName . (M.!) instances) instances
+                  in getItem "Instance" name by_name
 
 -- | Looks up a disk by uuid.
 getDisk :: ConfigData -> String -> ErrorResult Disk
@@ -291,7 +292,7 @@ getGroupNodes cfg gname =
   filter ((==gname) . nodeGroup) all_nodes
 
 -- | Get (primary, secondary) instances of a given node group.
-getGroupInstances :: ConfigData -> String -> ([Instance], [Instance])
+getGroupInstances :: ConfigData -> Uuid -> ([Instance], [Instance])
 getGroupInstances cfg gname =
   let gnodes = map nodeUuid (getGroupNodes cfg gname)
       ginsts = map (getNodeInstances cfg) gnodes in
@@ -338,7 +339,7 @@ getFilledInstOsParams cfg inst =
        Bad _             -> childOsParams
 
 -- | Looks up an instance's primary node.
-getInstPrimaryNode :: ConfigData -> String -> ErrorResult Node
+getInstPrimaryNode :: ConfigData -> Uuid -> ErrorResult Node
 getInstPrimaryNode cfg name =
   liftM instPrimaryNode (getInstance cfg name) >>= getNode cfg
 
@@ -355,7 +356,7 @@ getDrbdDiskNodes cfg disk =
 --
 -- As instances not using DRBD can be sent as a parameter as well,
 -- the primary node has to be appended to the results.
-getInstAllNodes :: ConfigData -> String -> ErrorResult [Node]
+getInstAllNodes :: ConfigData -> Uuid -> ErrorResult [Node]
 getInstAllNodes cfg name = do
   inst_disks <- getInstDisks cfg name
   let diskNodes = concatMap (getDrbdDiskNodes cfg) inst_disks
@@ -364,7 +365,7 @@ getInstAllNodes cfg name = do
 
 -- | Get disks for a given instance.
 -- The instance is specified by name or uuid.
-getInstDisks :: ConfigData -> String -> ErrorResult [Disk]
+getInstDisks :: ConfigData -> Uuid -> ErrorResult [Disk]
 getInstDisks cfg iname =
   getInstance cfg iname >>= mapM (getDisk cfg) . instDisks
 
@@ -424,9 +425,9 @@ roleSecondary = "secondary"
 -- | Gets the list of DRBD minors for an instance that are related to
 -- a given node.
 getInstMinorsForNode :: ConfigData
-                     -> String -- ^ The UUID of a node.
+                     -> Uuid -- ^ The UUID of a node.
                      -> Instance
-                     -> [(String, Int, String, String, String, String)]
+                     -> [(String, Int, Uuid, String, String, String)]
 getInstMinorsForNode cfg node inst =
   let role = if node == instPrimaryNode inst
                then rolePrimary

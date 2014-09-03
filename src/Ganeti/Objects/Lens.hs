@@ -39,7 +39,7 @@ class TimeStampObject a => TimeStampObjectL a where
 
 -- | Class of objects that have an UUID.
 class UuidObject a => UuidObjectL a where
-  uuidL :: Lens' a String
+  uuidL :: Lens' a Uuid
 
 -- | Class of object that have a serial number.
 class SerialNoObject a => SerialNoObjectL a where

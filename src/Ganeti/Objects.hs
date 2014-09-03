@@ -156,7 +156,7 @@ class TimeStampObject a where
 
 -- | Class of objects that have an UUID.
 class UuidObject a where
-  uuidOf :: a -> String
+  uuidOf :: a -> Uuid
 
 -- | Class of object that have a serial number.
 class SerialNoObject a where
@@ -535,7 +535,7 @@ data Disk = Disk
   , diskName       :: Maybe String
   , diskSpindles   :: Maybe Int
   , diskParams     :: Maybe DiskParams
-  , diskUuid       :: String
+  , diskUuid       :: Uuid
   , diskSerial     :: Int
   , diskCtime      :: ClockTime
   , diskMtime      :: ClockTime
@@ -584,8 +584,8 @@ $(buildParam "Be" "bep"
   ])
 
 $(buildObject "Instance" "inst" $
-  [ simpleField "name"             [t| String             |]
-  , simpleField "primary_node"     [t| String             |]
+  [ simpleField "name"             [t| Uuid               |]
+  , simpleField "primary_node"     [t| Uuid               |]
   , simpleField "os"               [t| String             |]
   , simpleField "hypervisor"       [t| Hypervisor         |]
   , simpleField "hvparams"         [t| HvParams           |]
@@ -595,7 +595,7 @@ $(buildObject "Instance" "inst" $
   , simpleField "admin_state"      [t| AdminState         |]
   , simpleField "admin_state_source" [t| AdminStateSource   |]
   , simpleField "nics"             [t| [PartialNic]       |]
-  , simpleField "disks"            [t| [String]           |]
+  , simpleField "disks"            [t| [Uuid]             |]
   , simpleField "disk_template"    [t| DiskTemplate       |]
   , simpleField "disks_active"     [t| Bool               |]
   , optionalField $ simpleField "network_port" [t| Int  |]
@@ -831,7 +831,7 @@ $(buildObject "Cluster" "cluster" $
   , simpleField "reserved_lvs"                   [t| [String]                |]
   , optionalField $
     simpleField "drbd_usermode_helper"           [t| String                  |]
-  , simpleField "master_node"                    [t| String                  |]
+  , simpleField "master_node"                    [t| Uuid                    |]
   , simpleField "master_ip"                      [t| String                  |]
   , simpleField "master_netdev"                  [t| String                  |]
   , simpleField "master_netmask"                 [t| Int                     |]
@@ -900,7 +900,7 @@ $(buildObject "ConfigData" "config" $
   , simpleField "cluster"    [t| Cluster             |]
   , simpleField "nodes"      [t| Container Node      |]
   , simpleField "nodegroups" [t| Container NodeGroup |]
-  , simpleField "instances"  [t| Container Instance  |]
+  , simpleField "instances"  [t| GenericContainer Uuid Instance  |]
   , simpleField "networks"   [t| Container Network   |]
   , simpleField "disks"      [t| Container Disk      |]
   ]
@@ -917,7 +917,7 @@ instance TimeStampObject ConfigData where
 -- * Master network parameters
 
 $(buildObject "MasterNetworkParameters" "masterNetworkParameters"
-  [ simpleField "uuid"      [t| String   |]
+  [ simpleField "uuid"      [t| Uuid     |]
   , simpleField "ip"        [t| String   |]
   , simpleField "netmask"   [t| Int      |]
   , simpleField "netdev"    [t| String   |]

@@ -41,7 +41,7 @@ import Ganeti.Path
 import Ganeti.Utils (getCurrentTime)
 
 -- | Get master node name.
-clusterMasterNodeName :: ConfigData -> ErrorResult String
+clusterMasterNodeName :: ConfigData -> ErrorResult Uuid
 clusterMasterNodeName cfg =
   let cluster = configCluster cfg
       masterNodeUuid = clusterMasterNode cluster

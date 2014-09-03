@@ -41,6 +41,7 @@ module Ganeti.THH.Field
   ) where
 
 import Control.Monad
+import Data.Char
 import qualified Data.Set as Set
 import Language.Haskell.TH
 import qualified Text.JSON as JSON
@@ -49,6 +50,7 @@ import System.Time (ClockTime(..))
 
 import Ganeti.JSON
 import Ganeti.THH
+import Ganeti.Types (Uuid)
 
 -- * Internal functions
 
@@ -107,8 +109,8 @@ serialFields =
     [ renameField  "Serial" $ simpleField "serial_no" [t| Int |] ]
 
 -- | UUID fields description.
-uuidFields :: [Field]
-uuidFields = [ simpleField "uuid" [t| String |] ]
+uuidFields :: String -> [Field]
+uuidFields name = [ simpleField "uuid" [t| typeOfFun $ camelCase name ++ "Uuid" |] ]
 
 -- | Tag set type alias.
 type TagSet = Set.Set String

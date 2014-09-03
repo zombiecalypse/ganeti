@@ -55,7 +55,7 @@ checkUUIDKeys what = mapM_ check . M.toList . fromContainer
   where
     check (uuid, x) = reportIf (uuid /= uuidOf x)
                       $ what ++ " '" ++ show x
-                        ++ "' is indexed by wrong UUID '" ++ uuid ++ "'"
+                        ++ "' is indexed by wrong UUID '" ++ uuidString uuid ++ "'"
 
 -- | Checks that all linked UUID of given objects exist.
 checkUUIDRefs :: (UuidObject a, Show a, F.Foldable f)

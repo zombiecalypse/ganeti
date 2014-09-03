@@ -164,12 +164,14 @@ module Ganeti.Types
   , hotplugActionToRaw
   , Private(..)
   , showPrivateJSObject
+  , Uuid(..)
   ) where
 
-import Control.Monad (liftM)
+import Control.Monad (liftM, guard)
 import qualified Text.JSON as JSON
-import Text.JSON (JSON, readJSON, showJSON)
+import Text.JSON (JSON, readJSON, showJSON, Result)
 import Data.Ratio (numerator, denominator)
+import qualified Text.Regex.PCRE as Regex
 
 import qualified Ganeti.ConstantUtils as ConstantUtils
 import Ganeti.JSON
@@ -937,3 +939,27 @@ showPrivateJSObject :: (JSON.JSON a) =>
                        [(String, a)] -> JSON.JSObject (Private JSON.JSValue)
 showPrivateJSObject value = JSON.toJSObject $ map f value
   where f (k, v) = (k, Private $ JSON.showJSON v)
+
+data DiskUuid = DiskUuid { diskUuidString :: String }
+  deriving (Eq, Ord, Show)
+
+class Uuid a where
+  uuidString :: a -> String
+
+uuidPattern :: String
+uuidPattern = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+
+instance (Uuid a) => JSON a where
+  readJSON s = do
+    str <- readJSON s :: Result String
+    guard $ str Regex.=~ uuidPattern
+    return $ Uuid str
+  showJSON (Uuid s) = showJSON s
+
+instance HasStringRepr Uuid where
+  fromStringRepr s = do
+    if s Regex.=~ uuidPattern
+    then return ()
+    else fail "Not an UUID"
+    return $ Uuid s
+  toStringRepr (Uuid s) = s
