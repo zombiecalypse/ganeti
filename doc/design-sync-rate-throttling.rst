@@ -9,12 +9,14 @@ synchronization tasks. A use-case of this is that moving instances might
 otherwise clog the network for the nodes. If the replication network differs
 from the network used by the instances, there would be no benefits.
 
-Namely there should be two limits that can be set:
+Namely there should be three limits that can be set:
 
 * `resync-rate`: which should not be exceeded for each device. This exists
   already.
 * `total-resync-rate`: which should not be exceeded collectively for each
   node.
+* `inter-group-resync-rate`: which should not be exceeded in collectively
+  for each group.
 
 Configuration
 ------------
@@ -24,6 +26,7 @@ follows::
 
   gnt-cluster modify -D resync-rate=<bytes-per-second>
   gnt-cluster modify -D total-resync-rate=<bytes-per-second>
+  gnt-cluster modify -D inter-group-resync-rate=<bytes-per-second>
 
 Where ``bytes-per-second`` can be in the format ``<N>{b,k,M,G}`` to set the
 limit to N bytes, kilobytes, megabytes, and gigabytes respectively.
@@ -36,6 +39,11 @@ The rate limit that is set for the drbdsetup is at least
   rate = min(resync-rate,
              total-resync-rate/number-of-syncing-devices)
 
+or if the sync is between node groups
+
+  rate = min(resync-rate,
+             total-resync-rate/number-of-syncing-devices,
+             inter-group-resync-sync-rate/number-of-inter-group-syncs-of-group)
 
 where number-of-syncing-devices is checked on beginning and end of syncs. This
 is set on each node with
