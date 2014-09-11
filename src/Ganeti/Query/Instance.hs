@@ -116,9 +116,6 @@ instanceFields =
   , (FieldDefinition "admin_up" "Autostart" QFTBool
      "Desired state of instance",
      FieldSimple (rsNormal . (== AdminUp) . instAdminState), QffNormal)
-  , (FieldDefinition "disk_template" "Disk_template" QFTText
-     "Instance disk template",
-     FieldSimple (rsNormal . instDiskTemplate), QffNormal)
   , (FieldDefinition "disks_active" "DisksActive" QFTBool
      "Desired state of instance disks",
      FieldSimple (rsNormal . instDisksActive), QffNormal)
@@ -376,11 +373,10 @@ getDiskSizeRequirements cfg inst =
  where
   getSizes :: Disk -> Int
   getSizes disk =
-    case instDiskTemplate inst of
-      DTDrbd8 -> diskSize disk + C.drbdMetaSize
-      DTDiskless -> 0
-      DTBlock    -> 0
-      _          -> diskSize disk
+    case diskLogicalId disk of
+      LIDDrbd8 _ _ _ _ _ _ -> diskSize disk + C.drbdMetaSize
+      LIDBlockDev _ _      -> 0
+      _                    -> diskSize disk
 
 -- | Get a list of disk sizes for an instance
 getDiskSizes :: ConfigData -> Instance -> ResultEntry

@@ -163,8 +163,6 @@ instance Arbitrary Instance where
       <*> arbitrary
       -- disks
       <*> vectorOf 5 arbitrary
-      -- disk template
-      <*> arbitrary
       -- disks active
       <*> arbitrary
       -- network port
