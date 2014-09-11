@@ -374,8 +374,8 @@ getDiskSizeRequirements cfg inst =
   getSizes :: Disk -> Int
   getSizes disk =
     case diskLogicalId disk of
-      LIDDrbd8 _ _ _ _ _ _ -> diskSize disk + C.drbdMetaSize
-      LIDBlockDev _ _      -> 0
+      LIDDrbd8{} -> diskSize disk + C.drbdMetaSize
+      LIDBlockDev{}      -> 0
       _                    -> diskSize disk
 
 -- | Get a list of disk sizes for an instance
