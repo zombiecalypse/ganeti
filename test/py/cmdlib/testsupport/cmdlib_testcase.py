@@ -384,6 +384,13 @@ class CmdlibTestCase(testutils.GanetiTestCase):
         return group
     assert False
 
+  def MockOut(self, *args, **kwargs):
+    """Immediately start mock.patch.object."""
+    patcher = mock.patch.object(*args, **kwargs)
+    mocked = patcher.start()
+    self.addCleanup(patcher.stop)
+    return mocked
+
 
 # pylint: disable=C0103
 def withLockedLU(func):
