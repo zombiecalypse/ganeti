@@ -1344,7 +1344,8 @@ class LUInstanceCreate(LogicalUnit):
       pass
     elif self.op.wait_for_sync:
       disk_abort = not WaitForSync(self, instance)
-    elif instance.disk_template in constants.DTS_INT_MIRROR:
+    elif any(d.dev_type in constants.DTS_INT_MIRROR
+             for d in self.cfg.GetInstanceDisks(instance.uuid)):
       # make sure the disks are not degraded (still sync-ing is ok)
       feedback_fn("* checking mirrors status")
       disk_abort = not WaitForSync(self, instance, oneshot=True)
@@ -3220,7 +3221,8 @@ class LUInstanceSetParams(LogicalUnit):
     # (as with NICs), because we need to know the instance's disk template
     ver_fn = lambda op, par: self._VerifyDiskModification(op, par, excl_stor,
                                                           group_access_type)
-    if self.instance.disk_template == constants.DT_EXT:
+    if all(d.dev_type == constants.DT_EXT
+           for d in self.cfg.GetInstanceDisks(self.instance.uuid)):
       self._CheckMods("disk", self.op.disks, {}, ver_fn)
     else:
       self._CheckMods("disk", self.op.disks, constants.IDISK_PARAMS_TYPES,
@@ -3229,7 +3231,8 @@ class LUInstanceSetParams(LogicalUnit):
     self.diskmod = _PrepareContainerMods(self.op.disks, None)
 
     # Check the validity of the `provider' parameter
-    if self.instance.disk_template in constants.DT_EXT:
+    if any(d.dev_type in constants.DT_EXT
+           for d in self.cfg.GetInstanceDisks(self.instance.uuid)):
       for mod in self.diskmod:
         ext_provider = mod[2].get(constants.IDISK_PROVIDER, None)
         if mod[0] == constants.DDM_ADD:
@@ -3263,6 +3266,8 @@ class LUInstanceSetParams(LogicalUnit):
                                      " --no-wait-for-sync given.",
                                      errors.ECODE_INVAL)
 
+    # TODO allow disk operations in this case. But this will take the form of
+    # a separate LU.
     if self.op.disks and not self.instance.disks:
       raise errors.OpPrereqError("Disk operations not supported for"
                                  " diskless instances", errors.ECODE_INVAL)
