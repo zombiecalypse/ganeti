@@ -317,6 +317,20 @@ class TLMigrateInstance(Tasklet):
     self.allow_runtime_changes = allow_runtime_changes
     self.ignore_hvversions = ignore_hvversions
 
+  def DisksOfTypes(self, clz):
+    """Returns an iterable of all disks with disk type of a certain type.
+
+    """
+    disks = self.cfg.GetInstanceDisks(self.instance.uuid)
+    return [d for d in disks if d.dev_type in clz]
+
+  def DisksNotOfTypes(self, clz):
+    """Returns an iterable of all disks with disk type except a certain type.
+
+    """
+    disks = self.cfg.GetInstanceDisks(self.instance.uuid)
+    return [d for d in disks if d.dev_type not in clz]
+
   def CheckPrereq(self):
     """Check prerequisites.
 
@@ -337,16 +351,19 @@ class TLMigrateInstance(Tasklet):
                       " switching to failover")
       self.failover = True
 
-    if self.instance.disk_template not in constants.DTS_MIRRORED:
+    if self.DisksNotOfTypes(constants.DTS_MIRRORED):
       if self.failover:
         text = "failovers"
       else:
         text = "migrations"
+      invalid = set([d.dev_type
+                     for d in self.DisksNotOfTypes(constants.DTS_MIRRORED)])
       raise errors.OpPrereqError("Instance's disk layout '%s' does not allow"
-                                 " %s" % (self.instance.disk_template, text),
+                                 " %s" % (utils.CommaJoin(invalid), text),
                                  errors.ECODE_STATE)
 
-    if self.instance.disk_template in constants.DTS_EXT_MIRROR:
+    # TODO allow heterogeneous disk types if all are mirrored in some way.
+    if not self.DisksNotOfTypes(constants.DTS_EXT_MIRROR):
       CheckIAllocatorOrNode(self.lu, "iallocator", "target_node")
 
       if self.lu.op.iallocator:
@@ -382,13 +399,15 @@ class TLMigrateInstance(Tasklet):
                      keep=[self.instance.primary_node, self.target_node_uuid])
         ReleaseLocks(self.lu, locking.LEVEL_NODE_ALLOC)
 
-    else:
+    elif not self.DisksNotOfTypes(constants.DTS_INT_MIRROR):
       secondary_node_uuids = \
         self.cfg.GetInstanceSecondaryNodes(self.instance.uuid)
+      templates = set([d.dev_type
+                       for d in self.DisksOfTypes(constants.DTS_INT_MIRROR)])
       if not secondary_node_uuids:
         raise errors.ConfigurationError("No secondary node but using"
-                                        " %s disk template" %
-                                        self.instance.disk_template)
+                                        " %s disk templates" %
+                                        utils.CommaJoin(templates))
       self.target_node_uuid = target_node_uuid = secondary_node_uuids[0]
       if self.lu.op.iallocator or \
         (self.lu.op.target_node_uuid and
@@ -397,11 +416,11 @@ class TLMigrateInstance(Tasklet):
           text = "failed over"
         else:
           text = "migrated"
-        raise errors.OpPrereqError("Instances with disk template %s cannot"
+        raise errors.OpPrereqError("Instances with disk templates %s cannot"
                                    " be %s to arbitrary nodes"
                                    " (neither an iallocator nor a target"
                                    " node can be passed)" %
-                                   (self.instance.disk_template, text),
+                                   (utils.CommaJoin(templates), text),
                                    errors.ECODE_INVAL)
       nodeinfo = self.cfg.GetNodeInfo(target_node_uuid)
       group_info = self.cfg.GetNodeGroup(nodeinfo.group)
@@ -410,6 +429,9 @@ class TLMigrateInstance(Tasklet):
       CheckTargetNodeIPolicy(self.lu, ipolicy, self.instance, nodeinfo,
                              self.cfg, ignore=self.ignore_ipolicy)
 
+    else:
+      raise errors.OpPrereqError("Instance mixes internal and external "
+                                 "mirroring. This is not currently supported.")
     i_be = cluster.FillBE(self.instance)
 
     # check memory requirements on the secondary node
@@ -632,7 +654,7 @@ class TLMigrateInstance(Tasklet):
                        self.cfg.GetNodeName(self.source_node_uuid))
       demoted_node_uuid = self.target_node_uuid
 
-    if self.instance.disk_template in constants.DTS_INT_MIRROR:
+    if self.DisksOfTypes(constants.DTS_INT_MIRROR):
       self._EnsureSecondary(demoted_node_uuid)
       try:
         self._WaitUntilSync()
@@ -650,7 +672,7 @@ class TLMigrateInstance(Tasklet):
     """Try to revert the disk status after a failed migration.
 
     """
-    if self.instance.disk_template in constants.DTS_EXT_MIRROR:
+    if self.DisksOfTypes(constants.DTS_EXT_MIRROR):
       return
 
     try:
@@ -764,7 +786,7 @@ class TLMigrateInstance(Tasklet):
 
     self.migration_info = migration_info = result.payload
 
-    if self.instance.disk_template not in constants.DTS_EXT_MIRROR:
+    if self.DisksOfTypes(constants.DTS_EXT_MIRROR):
       # Then switch the disks to master/master mode
       self._EnsureSecondary(self.target_node_uuid)
       self._GoStandalone()
@@ -856,7 +878,7 @@ class TLMigrateInstance(Tasklet):
       raise errors.OpExecError("Could not finalize instance migration: %s" %
                                msg)
 
-    if self.instance.disk_template not in constants.DTS_EXT_MIRROR:
+    if self.DisksNotOfTypes(constants.DTS_EXT_MIRROR):
       self._EnsureSecondary(self.source_node_uuid)
       self._WaitUntilSync()
       self._GoStandalone()
@@ -865,7 +887,7 @@ class TLMigrateInstance(Tasklet):
 
     # If the instance's disk template is `rbd' or `ext' and there was a
     # successful migration, unmap the device from the source node.
-    if self.instance.disk_template in (constants.DT_RBD, constants.DT_EXT):
+    if self.DisksOfTypes((constants.DT_RBD, constants.DT_EXT)):
       inst_disks = self.cfg.GetInstanceDisks(self.instance.uuid)
       disks = ExpandCheckDisks(inst_disks, inst_disks)
       self.feedback_fn("* unmapping instance's disks from %s" %
@@ -978,7 +1000,7 @@ class TLMigrateInstance(Tasklet):
     self.source_node_uuid = self.instance.primary_node
 
     # FIXME: if we implement migrate-to-any in DRBD, this needs fixing
-    if self.instance.disk_template in constants.DTS_INT_MIRROR:
+    if self.DisksOfTypes(constants.DTS_INT_MIRROR):
       secondary_nodes = self.cfg.GetInstanceSecondaryNodes(self.instance.uuid)
       self.target_node_uuid = secondary_nodes[0]
       # Otherwise self.target_node has been populated either
