@@ -1150,10 +1150,20 @@ class LUClusterSetParams(LogicalUnit):
 
     """
     for disk_template in disabled_disk_templates:
-      if self.cfg.HasAnyDiskOfType(disk_template):
+      disks_with_type = [d for d in self.cfg.GetAllDiskInfo().values()
+                         if d.dev_type == disk_template]
+      if disks_with_type:
+        instance_uuids = [self.cfg.GetInstanceForDisk(d.uuid)
+                     for d in disks_with_type]
+        instances = [self.cfg.GetInstanceInfo(uuid) for uuid in instance_uuids]
+        instance_desc = [("on " + inst.name) if inst else "detached"
+                         for inst in instances]
+        disk_desc = ["%s (%s)" % (disk, inst)
+                     for disk, inst in zip(disks_with_type, instance_desc)]
         raise errors.OpPrereqError(
             "Cannot disable disk template '%s', because there is at least one"
-            " instance using it." % disk_template,
+            " disk using it: %s"
+            % (disk_template, utils.CommaJoin(disk_desc)),
             errors.ECODE_STATE)
 
   @staticmethod
