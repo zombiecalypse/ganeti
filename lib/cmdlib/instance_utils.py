@@ -256,7 +256,23 @@ def RemoveInstance(lu, feedback_fn, instance, ignore_failures):
   lu.cfg.RemoveInstance(instance.uuid)
 
 
-def RemoveDisks(lu, instance, disk_template=None, disks=None,
+def _RemovesAllDisksOfType(all_disks, disks, type):
+  """Returns all disk uuids of the type the instance has after removing disks.
+
+  @type all_disks: list of Disk
+  @param all_disks: all the instance's disks
+  @type disks: list of Disk
+  @param disks: the disks to be removed
+  @type type: disk type
+  @param type: only return disks of this type
+  @rtype: boolean
+  @return: if the action will remove the last disk of this type
+  """
+  before = set(d.uuid for d in all_disks if d.dev_type == type)
+  removed = set(d.uuid for d in disks if d.dev_type == type)
+  return removed and not (before - removed)
+
+def RemoveDisks(lu, instance, disk_types=None, disks=None,
                 target_node_uuid=None, ignore_failures=False):
   """Remove all or a subset of disks for an instance.
 
@@ -273,8 +289,8 @@ def RemoveDisks(lu, instance, disk_template=None, disks=None,
   @param lu: the logical unit on whose behalf we execute
   @type instance: L{objects.Instance}
   @param instance: the instance whose disks we should remove
-  @type disk_template: string
-  @param disk_template: if passed, overrides the instance's disk_template
+  @type disk_templates: dict of uuid to string
+  @param disk_template: if passed, overrides the disk's type
   @type disks: list of L{objects.Disk}
   @param disks: the disks to remove; if not specified, all the disks of the
           instance are removed
@@ -291,11 +307,14 @@ def RemoveDisks(lu, instance, disk_template=None, disks=None,
   ports_to_release = set()
 
   disk_count = len(instance.disks)
-  if disks is None:
-    disks = lu.cfg.GetInstanceDisks(instance.uuid)
 
-  if disk_template is None:
-    disk_template = instance.disk_template
+  all_disks = lu.cfg.GetInstanceDisks(instance.uuid)
+
+  if disks is None:
+    disks = all_disks
+
+  if disk_types is None:
+    disk_types = [d.dev_type for d in disks]
 
   anno_disks = AnnotateDiskParams(instance, disks, lu.cfg)
   for (idx, device) in enumerate(anno_disks):
@@ -320,19 +339,22 @@ def RemoveDisks(lu, instance, disk_template=None, disks=None,
     for port in ports_to_release:
       lu.cfg.AddTcpUdpPort(port)
 
-  CheckDiskTemplateEnabled(lu.cfg.GetClusterInfo(), disk_template)
+  for t in disk_types:
+    CheckDiskTemplateEnabled(lu.cfg.GetClusterInfo(), t)
 
-  if (len(disks) == disk_count and
-      disk_template in [constants.DT_FILE, constants.DT_SHARED_FILE]):
-    if len(disks) > 0:
-      file_storage_dir = os.path.dirname(disks[0].logical_id[1])
-    else:
-      if disk_template == constants.DT_SHARED_FILE:
-        file_storage_dir = utils.PathJoin(lu.cfg.GetSharedFileStorageDir(),
-                                          instance.name)
-      else:
-        file_storage_dir = utils.PathJoin(lu.cfg.GetFileStorageDir(),
-                                          instance.name)
+  # Remove instance directory if no disks of the file type remain.
+  removed_storage_dirs = []
+  if _RemovesAllDisksOfType(all_disks, disks, constants.DT_FILE):
+    one_file_disk = next(d for d in disks if d.dev_type == constants.DT_FILE)
+    removed_storage_dirs.append(
+        os.path.dirname(one_file_disk.logical_id[1]))
+  if _RemovesAllDisksOfType(all_disks, disks, constants.DT_SHARED_FILE):
+    one_shared_file_disk = next(d for d in disks
+                                if d.dev_type == constants.DT_SHARED_FILE)
+    removed_storage_dirs.append(
+        os.path.dirname(one_shared_file_disk.logical_id[1]))
+
+  for file_storage_dir in removed_storage_dirs:
     if target_node_uuid:
       tgt = target_node_uuid
     else:

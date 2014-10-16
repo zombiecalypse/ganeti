@@ -3815,7 +3815,7 @@ class LUInstanceSetParams(LogicalUnit):
           self.LogInfo("The instance will not be affected, aborting operation")
           self.LogInfo("Removing newly created disks of type '%s'..." %
                        template_info)
-          RemoveDisks(self, self.instance, disk_template=self.op.disk_template,
+          RemoveDisks(self, self.instance, disk_types=[template_info],
                       disks=new_disks)
           self.LogInfo("Newly created disks removed successfully")
         finally:
@@ -3860,7 +3860,7 @@ class LUInstanceSetParams(LogicalUnit):
 
     feedback_fn("Removing old block devices of type '%s'..." %
                 old_disk_template)
-    RemoveDisks(self, self.instance, disk_template=old_disk_template,
+    RemoveDisks(self, self.instance, disk_types=[old_disk_template],
                 disks=old_disks)
 
     # Node resource locks will be released by the caller.
@@ -3992,14 +3992,14 @@ class LUInstanceSetParams(LogicalUnit):
     ReleaseLocks(self, locking.LEVEL_NODE)
 
     feedback_fn("Removing volumes on the secondary node...")
-    RemoveDisks(self, self.instance, disk_template=constants.DT_DRBD8,
+    RemoveDisks(self, self.instance, disk_types=[constants.DT_DRBD8],
                 disks=old_disks, target_node_uuid=snode_uuid)
 
     feedback_fn("Removing unneeded volumes on the primary node...")
     meta_disks = []
     for idx, disk in enumerate(old_disks):
       meta_disks.append(disk.children[1])
-    RemoveDisks(self, self.instance, disk_template=constants.DT_DRBD8,
+    RemoveDisks(self, self.instance, disk_types=[constants.DT_DRBD8],
                 disks=meta_disks)
 
   def _HotplugDevice(self, action, dev_type, device, extra, seq):
