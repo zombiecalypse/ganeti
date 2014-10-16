@@ -2583,7 +2583,7 @@ def _ApplyContainerMods(kind, container, chgdesc, mods,
       try:
         idx = int(identifier)
       except ValueError:
-        raise errors.OpPrereqError("Only possitive integer or -1 is accepted as"
+        raise errors.OpPrereqError("Only positive integer or -1 is accepted as"
                                    " identifier for %s" % constants.DDM_ADD,
                                    errors.ECODE_INVAL)
       if idx == -1:
@@ -3081,11 +3081,12 @@ class LUInstanceSetParams(LogicalUnit):
     pnode_uuid = self.instance.primary_node
 
     inst_disks = self.cfg.GetInstanceDisks(self.instance.uuid)
-    if not inst_disks or any(d.dev_type in constants.DTS_NOT_CONVERTIBLE_FROM
-                             for d in inst_disks):
-      raise errors.OpPrereqError("Conversion from the '%s' disk template is"
-                                 " not supported" % self.instance.disk_template,
-                                 errors.ECODE_INVAL)
+    unsupported = [d.dev_type in constants.DTS_NOT_CONVERTIBLE_FROM
+                   for d in inst_disks]
+    if not inst_disks or unsupported_from:
+      raise errors.OpPrereqError(
+          "Conversion from the disk types %s is not supported"
+          % utils.CommaJoin(unsupported), errors.ECODE_INVAL)
 
     elif self.op.disk_template in constants.DTS_NOT_CONVERTIBLE_TO:
       raise errors.OpPrereqError("Conversion to the '%s' disk template is"
@@ -3095,8 +3096,7 @@ class LUInstanceSetParams(LogicalUnit):
     if (self.op.disk_template != constants.DT_EXT and
         all(d.dev_type == self.op.disk_template for d in inst_disks)):
       raise errors.OpPrereqError("Instance already has disk template %s" %
-                                 self.instance.disk_template,
-                                 errors.ECODE_INVAL)
+                                 inst_disks[0].dev_type, errors.ECODE_INVAL)
 
     if not self.cluster.IsDiskTemplateEnabled(self.op.disk_template):
       enabled_dts = utils.CommaJoin(self.cluster.enabled_disk_templates)
@@ -4023,7 +4023,8 @@ class LUInstanceSetParams(LogicalUnit):
     """
     # add a new disk
     instance_disks = self.cfg.GetInstanceDisks(self.instance.uuid)
-    if self.instance.disk_template in constants.DTS_FILEBASED:
+    disk_type = params.get('disk_type', self.instance.disk_template)
+    if disk_type in constants.DTS_FILEBASED:
       (file_driver, file_path) = instance_disks[0].logical_id
       file_path = os.path.dirname(file_path)
     else:
@@ -4031,7 +4032,7 @@ class LUInstanceSetParams(LogicalUnit):
 
     secondary_nodes = self.cfg.GetInstanceSecondaryNodes(self.instance.uuid)
     disk = \
-      GenerateDiskTemplate(self, self.instance.disk_template,
+      GenerateDiskTemplate(self, disk_type,
                            self.instance.uuid, self.instance.primary_node,
                            secondary_nodes, [params], file_path,
                            file_driver, idx, self.Log, self.diskparams)[0]
