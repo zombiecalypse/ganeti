@@ -877,11 +877,13 @@ class TestLUClusterSetParams(CmdlibTestCase):
   def testDisableDiskTemplateWithExistingInstance(self):
     enabled_disk_templates = [constants.DT_DISKLESS]
     self.cfg.AddNewInstance(
+      name='mock1.example.com',
       disks=[self.cfg.CreateDisk(dev_type=constants.DT_PLAIN)])
     op = opcodes.OpClusterSetParams(
            enabled_disk_templates=enabled_disk_templates,
            ipolicy={constants.IPOLICY_DTS: enabled_disk_templates})
-    self.ExecOpCodeExpectOpPrereqError(op, "Cannot disable disk template")
+    self.ExecOpCodeExpectOpPrereqError(
+        op, "Cannot disable disk template.*on mock1.example.com")
 
   def testVgNameNoLvmDiskTemplateEnabled(self):
     vg_name = "test_vg"
@@ -1027,7 +1029,6 @@ class TestLUClusterSetParams(CmdlibTestCase):
       compression_tools = [value, "gzip"]
       op = opcodes.OpClusterSetParams(compression_tools=compression_tools)
       self.ExecOpCodeExpectOpPrereqError(op, re.escape(value))
-
 
 class TestLUClusterVerify(CmdlibTestCase):
   def testVerifyAllGroups(self):

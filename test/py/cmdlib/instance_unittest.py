@@ -2530,7 +2530,7 @@ class TestLUInstanceSetParams(CmdlibTestCase):
                            instance_name=inst.name,
                            disk_template=constants.DT_PLAIN)
       self.ExecOpCodeExpectOpPrereqError(
-        op, "Conversion from the .* disk template is not supported")
+        op, "Conversion from the disk types .* is not supported")
 
   def testConvertToDRBDWithSecondarySameAsPrimary(self):
     op = self.CopyOpCode(self.op,
