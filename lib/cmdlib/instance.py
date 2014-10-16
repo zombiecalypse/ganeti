@@ -3081,9 +3081,11 @@ class LUInstanceSetParams(LogicalUnit):
     pnode_uuid = self.instance.primary_node
 
     inst_disks = self.cfg.GetInstanceDisks(self.instance.uuid)
-    unsupported = [d.dev_type in constants.DTS_NOT_CONVERTIBLE_FROM
-                   for d in inst_disks]
-    if not inst_disks or unsupported_from:
+    unsupported = [d.dev_type for d in inst_disks
+                   if d.dev_type in constants.DTS_NOT_CONVERTIBLE_FROM]
+    if not inst_disks or unsupported:
+      if not inst_disks:
+        unsupported = [constants.DT_DISKLESS]
       raise errors.OpPrereqError(
           "Conversion from the disk types %s is not supported"
           % utils.CommaJoin(unsupported), errors.ECODE_INVAL)
