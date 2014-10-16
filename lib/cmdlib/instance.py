@@ -3793,12 +3793,13 @@ class LUInstanceSetParams(LogicalUnit):
     # Transfer the data from the old to the newly created disks of the instance.
     feedback_fn("Populating the new empty disks of type '%s'..." %
                 template_info)
+    cleanup_ports = []
     for idx, (old, new) in enumerate(zip(old_disks, new_disks)):
       feedback_fn(" - copying data from disk %s (%s), size %s" %
-                  (idx, self.instance.disk_template,
-                   utils.FormatUnit(new.size, "h")))
-      if self.instance.disk_template == constants.DT_DRBD8:
+                  (idx, old.dev_type, utils.FormatUnit(new.size, "h")))
+      if old.dev_type == constants.DT_DRBD8:
         old = old.children[0]
+        cleanup_ports.append(disk.logical_id[2])
       result = self.rpc.call_blockdev_convert(pnode_uuid, (old, self.instance),
                                               (new, self.instance))
       msg = result.fail_msg
@@ -3806,7 +3807,7 @@ class LUInstanceSetParams(LogicalUnit):
         # A disk failed to copy. Abort the conversion operation and rollback
         # the modifications to the previous state. The instance will remain
         # intact.
-        if self.op.disk_template == constants.DT_DRBD8:
+        if template_info == constants.DT_DRBD8:
           new = new.children[0]
         self.Log(" - ERROR: Could not copy disk '%s' to '%s'" %
                  (old.logical_id[1], new.logical_id[1]))
@@ -3822,20 +3823,18 @@ class LUInstanceSetParams(LogicalUnit):
           self.cfg.ReleaseDRBDMinors(self.instance.uuid)
           result.Raise("Error while converting the instance's template")
 
-    # In case of DRBD disk, return its port to the pool
-    if self.instance.disk_template == constants.DT_DRBD8:
-      for disk in old_disks:
-        tcp_port = disk.logical_id[2]
-        self.cfg.AddTcpUdpPort(tcp_port)
+
+    for tcp_port in cleanup_ports:
+      self.cfg.AddTcpUdpPort(tcp_port)
+
+    disks = self.cfg.GetInstanceDisks(self.instance.uuid)
 
     # Remove old disks from the instance.
+    templates = set([d.dev_type for d in disks])
     feedback_fn("Detaching old disks (%s) from the instance and removing"
-                " them from cluster config" % self.instance.disk_template)
+                " them from cluster config" % utils.CommaJoin(templates))
     for old_disk in old_disks:
       self.cfg.RemoveInstanceDisk(self.instance.uuid, old_disk.uuid)
-
-    # The old disk_template will be needed to remove the old block devices.
-    old_disk_template = self.instance.disk_template
 
     # Update the disk template of the instance
     self.cfg.SetInstanceDiskTemplate(self.instance.uuid, self.op.disk_template)
@@ -3858,8 +3857,8 @@ class LUInstanceSetParams(LogicalUnit):
       raise errors.OpExecError("There are some degraded disks for"
                                " this instance, please cleanup manually")
 
-    feedback_fn("Removing old block devices of type '%s'..." %
-                old_disk_template)
+    feedback_fn("Removing old block devices of types '%s'..." %
+                utils.CommaJoin(set(d.dev_type for d in old_disks)))
     RemoveDisks(self, self.instance, disk_types=[old_disk_template],
                 disks=old_disks)
 
