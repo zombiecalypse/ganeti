@@ -2556,8 +2556,10 @@ def AcceptInstance(instance, info, target):
   @param target: target host (usually ip), on this node
 
   """
+  ext_mirror = [d for d in instance.disks_info
+                if d.dev_type in constants.DTS_EXT_MIRROR]
   # TODO: why is this required only for DTS_EXT_MIRROR?
-  if instance.disk_template in constants.DTS_EXT_MIRROR:
+  if ext_mirror:
     # Create the symlinks, as the disks are not active
     # in any way
     try:
@@ -2569,8 +2571,8 @@ def AcceptInstance(instance, info, target):
   try:
     hyper.AcceptInstance(instance, info, target)
   except errors.HypervisorError, err:
-    if instance.disk_template in constants.DTS_EXT_MIRROR:
-      _RemoveBlockDevLinks(instance.name, instance.disks_info)
+    if ext_mirror:
+      _RemoveBlockDevLinks(instance.name, ext_mirror)
     _Fail("Failed to accept instance: %s", err, exc=True)
 
 
