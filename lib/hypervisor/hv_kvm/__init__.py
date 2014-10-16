@@ -971,14 +971,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       aio_val = ""
     # Cache mode
     disk_cache = up_hvp[constants.HV_DISK_CACHE]
-    if instance.disk_template in constants.DTS_EXT_MIRROR:
-      if disk_cache != "none":
-        # TODO: make this a hard error, instead of a silent overwrite
-        logging.warning("KVM: overriding disk_cache setting '%s' with 'none'"
-                        " to prevent shared storage corruption on migration",
-                        disk_cache)
-      cache_val = ",cache=none"
-    elif disk_cache != constants.HT_CACHE_DEFAULT:
+    if disk_cache != constants.HT_CACHE_DEFAULT:
       cache_val = ",cache=%s" % disk_cache
     else:
       cache_val = ""
@@ -996,8 +989,18 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
       drive_uri, _ = _GetDriveURI(cfdev, link_name, uri)
 
+      if cfdev.dev_type in constants.DTS_EXT_MIRROR:
+        if disk_cache != "none":
+          # TODO: make this a hard error, instead of a silent overwrite
+          logging.warning("KVM: overriding disk_cache setting '%s' with 'none'"
+                          " to prevent shared storage corruption on migration",
+                          disk_cache)
+        per_device_cache_val = ",cache=none"
+      else:
+        per_device_cache_val = cache_val
+
       drive_val = "file=%s,format=raw%s%s%s%s" % \
-                  (drive_uri, if_val, boot_val, cache_val, aio_val)
+                  (drive_uri, if_val, boot_val, per_device_cache_val, aio_val)
 
       if device_driver:
         # kvm_disks are the 4th entry of runtime file that did not exist in
