@@ -266,6 +266,7 @@ def CreateDisks(lu, instance, disk_template=None,
     all_node_uuids = [pnode_uuid]
 
   if disk_template is None:
+    # TODO: make this required
     disk_template = instance.disk_template
 
   CheckDiskTemplateEnabled(lu.cfg.GetClusterInfo(), disk_template)
