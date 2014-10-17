@@ -2698,7 +2698,7 @@ class LUInstanceSetParams(LogicalUnit):
       else:
         raise errors.ProgrammerError("Unhandled operation '%s'" % op)
 
-  def _VerifyDiskModification(self, op, params, excl_stor, group_access_type):
+  def _VerifyDiskModification(self, op, params, excl_stor, group_access_types):
     """Verifies a disk modification.
 
     """
@@ -2725,7 +2725,8 @@ class LUInstanceSetParams(LogicalUnit):
       for disk in self.cfg.GetInstanceDisks(self.instance.uuid):
         template = disk.dev_type
         if template in constants.DTS_HAVE_ACCESS:
-          access_type = params.get(constants.IDISK_ACCESS, group_access_type)
+          access_type = params.get(constants.IDISK_ACCESS,
+                                   group_access_types[template])
           if not IsValidDiskAccessModeCombination(self.instance.hypervisor,
                                                   template, access_type):
             raise errors.OpPrereqError("Selected hypervisor (%s) cannot be"
@@ -2740,7 +2741,10 @@ class LUInstanceSetParams(LogicalUnit):
 
       # Disk modification supports changing only the disk name and mode.
       # Changing arbitrary parameters is allowed only for ext disk template",
-      if self.instance.disk_template != constants.DT_EXT:
+      #
+      # TODO the parameters need to be at disk level
+      disks = self.cfg.GetInstanceDisks(self.instance.uuid)
+      if any(d.dev_type != constants.DT_EXT for d in disks):
         utils.ForceDictType(params, constants.MODIFIABLE_IDISK_PARAMS_TYPES)
       else:
         # We have to check that 'access' parameter can not be modified
@@ -3162,8 +3166,10 @@ class LUInstanceSetParams(LogicalUnit):
         nodes.append(snode_info)
       has_es = lambda n: IsExclusiveStorageEnabledNode(self.cfg, n)
       if compat.any(map(has_es, nodes)):
-        errmsg = ("Cannot convert disk template from %s to %s when exclusive"
-                  " storage is enabled" % (self.instance.disk_template,
+        disks = self.cfg.GetInstanceDisks(self.instance.uuid)
+        types = [d.dev_type for d in disks]
+        errmsg = ("Cannot convert disk template from (%s) to %s when exclusive"
+                  " storage is enabled" % (utils.CommaJoin(types),
                                            self.op.disk_template))
         raise errors.OpPrereqError(errmsg, errors.ECODE_STATE)
 
@@ -3215,14 +3221,15 @@ class LUInstanceSetParams(LogicalUnit):
     node_info = self.cfg.GetNodeInfo(self.instance.primary_node)
     node_group = self.cfg.GetNodeGroup(node_info.group)
     group_disk_params = self.cfg.GetGroupDiskParams(node_group)
-    group_access_type = group_disk_params[self.instance.disk_template].get(
-      constants.RBD_ACCESS, constants.DISK_KERNELSPACE
-    )
+    group_access_types = {}
+    for template, params in group_disk_params.items():
+      group_access_types[template] = params.get(
+          constants.RBD_ACCESS, constants.DISK_KERNELSPACE)
 
     # Check disk modifications. This is done here and not in CheckArguments
     # (as with NICs), because we need to know the instance's disk template
     ver_fn = lambda op, par: self._VerifyDiskModification(op, par, excl_stor,
-                                                          group_access_type)
+                                                          group_access_types)
     if all(d.dev_type == constants.DT_EXT
            for d in self.cfg.GetInstanceDisks(self.instance.uuid)):
       self._CheckMods("disk", self.op.disks, {}, ver_fn)
