@@ -7,7 +7,7 @@ Build dependencies
 ------------------
 
 Most dependencies from :doc:`install-quick`, including ``qemu-img``
-(marked there as optional) plus (for Python):
+and ``PSQueue`` (marked there as optional) plus (for Python):
 
 - `GNU make <http://www.gnu.org/software/make/>`_
 - `GNU tar <http://www.gnu.org/software/tar/>`_
