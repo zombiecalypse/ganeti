@@ -3760,14 +3760,17 @@ class LUInstanceSetParams(LogicalUnit):
       template_info = ":".join([self.op.disk_template,
                                 self.op.ext_params["provider"]])
 
+    disks = self.cfg.GetInstanceDisks(self.instance.uuid)
     feedback_fn("Converting disk template from '%s' to '%s'" %
-                (self.instance.disk_template, template_info))
+                (utils.CommaJoin(set(d.dev_type for d in disks)),
+                 template_info))
 
-    assert not (self.instance.disk_template in
-                constants.DTS_NOT_CONVERTIBLE_FROM or
+    assert not (any(d.dev_type in constants.DTS_NOT_CONVERTIBLE_FROM
+                    for d in self.cfg.GetInstanceDisks(self.instance.uuid)) or
                 self.op.disk_template in constants.DTS_NOT_CONVERTIBLE_TO), \
-      ("Unsupported disk template conversion from '%s' to '%s'" %
-       (self.instance.disk_template, self.op.disk_template))
+      ("Unsupported disk type conversion from '%s' to '%s'" %
+       (utils.CommaJoin(set(self.cfg.GetInstanceDisks(self.instance.uuid))),
+        self.op.disk_template))
 
     pnode_uuid = self.instance.primary_node
     snode_uuid = []
@@ -3876,18 +3879,28 @@ class LUInstanceSetParams(LogicalUnit):
   def _ConvertPlainToDrbd(self, feedback_fn):
     """Converts an instance from plain to drbd.
 
+    This assumes that there are disks of type PLAIN attached to the instance and
+    will convert them to DRBD. Disks not of the PLAIN type will be ignored.
+
     """
     feedback_fn("Converting disk template from 'plain' to 'drbd'")
 
     pnode_uuid = self.instance.primary_node
     snode_uuid = self.op.remote_node_uuid
 
-    assert self.instance.disk_template == constants.DT_PLAIN
+    assert any(d.dev_type == constants.DT_PLAIN
+               for d in self.cfg.GetInstanceDisks(self.instance.uuid))
 
-    old_disks = self.cfg.GetInstanceDisks(self.instance.uuid)
+    all_disks = self.cfg.GetInstanceDisks(self.instance.uuid)
+    old_disks, disks_info = [], []
+    for d, info in zip(all_disks, self.disks_info):
+      if d.dev_type == constants.DT_PLAIN:
+        old_disks.append(d)
+        disks_info.append(info)
+
     new_disks = GenerateDiskTemplate(self, self.op.disk_template,
                                      self.instance.uuid, pnode_uuid,
-                                     [snode_uuid], self.disks_info,
+                                     [snode_uuid], disks_info,
                                      None, None, 0,
                                      feedback_fn, self.diskparams)
     anno_disks = rpc.AnnotateDiskParams(new_disks, self.diskparams)
@@ -3957,6 +3970,9 @@ class LUInstanceSetParams(LogicalUnit):
 
   def _ConvertDrbdToPlain(self, feedback_fn):
     """Converts an instance from drbd to plain.
+
+    This assumes that there are disks of type DRBD attached to the instance and
+    will convert them to PLAIN. Disks not of the DRBD type will be ignored.
 
     """
     secondary_nodes = self.cfg.GetInstanceSecondaryNodes(self.instance.uuid)

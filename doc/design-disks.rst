@@ -169,6 +169,28 @@ with the instance's disk objects. So in the backend we will only have to
 replace the ``disks`` slot with ``disks_info``.
 
 
+Supporting the old interface
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The current interface is designed with a uniform disk type in mind and
+this interface should still be supported to not break tools and
+workflows downstream.
+
+The behaviour is fully compatible for instances with constantly
+attached, uniform disks.
+
+Whenever an operation operates on an instance, the operation will only
+consider the disks attached. If the operation is specific to a disk
+type, it will only consider disks with that type and ignore the rest
+(but throw an error as before if no disk of that type is attached).
+
+When setting the disk template of an instance, we convert all currently
+attached disks to that template. This means that all disk types
+currently attached must be convertible to the new template.
+
+
+
+
 Eliminating the disk template from the instance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
