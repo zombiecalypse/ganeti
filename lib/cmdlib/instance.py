@@ -3711,14 +3711,21 @@ class LUInstanceSetParams(LogicalUnit):
                                                          None)
 
       # Copy ispec to verify parameters with min/max values separately
+      count = ispec[constants.ISPEC_DISK_COUNT]
       if self.op.disk_template:
-        count = ispec[constants.ISPEC_DISK_COUNT]
-        new_disk_types = [self.op.disk_template] * count
+        disk_template = self.op.disk_template
       else:
         old_disks = self.cfg.GetInstanceDisks(self.instance.uuid)
-        add_disk_count = ispec[constants.ISPEC_DISK_COUNT] - len(old_disks)
-        new_disk_types = ([d.dev_type for d in old_disks] +
-                          [self.instance.disk_template] * add_disk_count)
+        old_templates = list(set(d.dev_type for d in old_disks))
+        if len(old_templates) > 1:
+          raise errors.OpPrereqError(
+              'Instance has multiple disk types (%s), create disks explicitly.'
+              % utils.CommaJoin(old_templates),
+              errors.ECODE_NOTUNIQUE)
+
+        disk_template = old_templates[0]
+
+      new_disk_types = [disk_template] * count
       ispec_max = ispec.copy()
       ispec_max[constants.ISPEC_MEM_SIZE] = \
         self.be_new.get(constants.BE_MAXMEM, None)
@@ -3760,7 +3767,11 @@ class LUInstanceSetParams(LogicalUnit):
       template_info = ":".join([self.op.disk_template,
                                 self.op.ext_params["provider"]])
 
-    disks = self.cfg.GetInstanceDisks(self.instance.uuid)
+    disks = [d for d in self.cfg.GetInstanceDisks(self.instance.uuid)
+             if d.dev_type not in (constants.DT_PLAIN, constants.DT_DRBD8)]
+    if not disks:
+      return
+
     feedback_fn("Converting disk template from '%s' to '%s'" %
                 (utils.CommaJoin(set(d.dev_type for d in disks)),
                  template_info))
@@ -3888,8 +3899,9 @@ class LUInstanceSetParams(LogicalUnit):
     pnode_uuid = self.instance.primary_node
     snode_uuid = self.op.remote_node_uuid
 
-    assert any(d.dev_type == constants.DT_PLAIN
-               for d in self.cfg.GetInstanceDisks(self.instance.uuid))
+    if not  any(d.dev_type == constants.DT_PLAIN
+                for d in self.cfg.GetInstanceDisks(self.instance.uuid)):
+      import pudb; pu.db
 
     all_disks = self.cfg.GetInstanceDisks(self.instance.uuid)
     old_disks, disks_info = [], []
@@ -3976,13 +3988,14 @@ class LUInstanceSetParams(LogicalUnit):
 
     """
     secondary_nodes = self.cfg.GetInstanceSecondaryNodes(self.instance.uuid)
+    disks = [d for d in self.cfg.GetInstanceDisks(self.instance.uuid)
+             if d.dev_type == constants.DT_DRBD8]
     assert len(secondary_nodes) == 1
-    assert self.instance.disk_template == constants.DT_DRBD8
+    assert disks
 
     snode_uuid = secondary_nodes[0]
     feedback_fn("Converting disk template from 'drbd' to 'plain'")
 
-    disks = self.cfg.GetInstanceDisks(self.instance.uuid)
     old_disks = AnnotateDiskParams(self.instance, disks, self.cfg)
     new_disks = [d.children[0] for d in disks]
 
@@ -4282,12 +4295,17 @@ class LUInstanceSetParams(LogicalUnit):
       if not r_shut:
         raise errors.OpExecError("Cannot shutdown instance disks, unable to"
                                  " proceed with disk template conversion")
-      mode = (self.instance.disk_template, self.op.disk_template)
+
+      dev_types = set(d.dev_type
+                      for d in self.cfg.GetInstanceDisks(self.instance.uuid))
       try:
-        if mode in self._DISK_CONVERSIONS:
-          self._DISK_CONVERSIONS[mode](self, feedback_fn)
-        else:
-          self._ConvertInstanceTemplate(feedback_fn)
+        if (self.op.disk_template == constants.DT_DRBD8 and
+            constants.DT_PLAIN in dev_types):
+          self._ConvertPlainToDrbd(feedback_fn)
+        elif (self.op.disk_template == constants.DT_PLAIN and
+            constants.DT_DRBD8 in dev_types):
+          self._ConvertDrbdToPlain(feedback_fn)
+        self._ConvertInstanceTemplate(feedback_fn)
       except:
         self.cfg.ReleaseDRBDMinors(self.instance.uuid)
         raise
