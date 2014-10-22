@@ -3899,10 +3899,6 @@ class LUInstanceSetParams(LogicalUnit):
     pnode_uuid = self.instance.primary_node
     snode_uuid = self.op.remote_node_uuid
 
-    if not  any(d.dev_type == constants.DT_PLAIN
-                for d in self.cfg.GetInstanceDisks(self.instance.uuid)):
-      import pudb; pu.db
-
     all_disks = self.cfg.GetInstanceDisks(self.instance.uuid)
     old_disks, disks_info = [], []
     for d, info in zip(all_disks, self.disks_info):
