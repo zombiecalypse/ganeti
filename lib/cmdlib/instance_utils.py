@@ -256,20 +256,20 @@ def RemoveInstance(lu, feedback_fn, instance, ignore_failures):
   lu.cfg.RemoveInstance(instance.uuid)
 
 
-def _RemovesAllDisksOfType(all_disks, disks, type):
+def _RemovesAllDisksOfType(all_disks, disks, dev_type):
   """Returns all disk uuids of the type the instance has after removing disks.
 
   @type all_disks: list of Disk
   @param all_disks: all the instance's disks
   @type disks: list of Disk
   @param disks: the disks to be removed
-  @type type: disk type
-  @param type: only return disks of this type
+  @type dev_type: disk type
+  @param dev_type: only return disks of this type
   @rtype: boolean
   @return: if the action will remove the last disk of this type
   """
-  before = set(d.uuid for d in all_disks if d.dev_type == type)
-  removed = set(d.uuid for d in disks if d.dev_type == type)
+  before = set(d.uuid for d in all_disks if d.dev_type == dev_type)
+  removed = set(d.uuid for d in disks if d.dev_type == dev_type)
   return removed and not (before - removed)
 
 def RemoveDisks(lu, instance, disk_types=None, disks=None,
@@ -305,8 +305,6 @@ def RemoveDisks(lu, instance, disk_types=None, disks=None,
 
   all_result = True
   ports_to_release = set()
-
-  disk_count = len(instance.disks)
 
   all_disks = lu.cfg.GetInstanceDisks(instance.uuid)
 

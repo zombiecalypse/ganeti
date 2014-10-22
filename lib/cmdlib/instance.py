@@ -3822,7 +3822,7 @@ class LUInstanceSetParams(LogicalUnit):
                   (idx, old.dev_type, utils.FormatUnit(new.size, "h")))
       if old.dev_type == constants.DT_DRBD8:
         old = old.children[0]
-        cleanup_ports.append(disk.logical_id[2])
+        cleanup_ports.append(old.logical_id[2])
       result = self.rpc.call_blockdev_convert(pnode_uuid, (old, self.instance),
                                               (new, self.instance))
       msg = result.fail_msg
@@ -3882,7 +3882,7 @@ class LUInstanceSetParams(LogicalUnit):
 
     feedback_fn("Removing old block devices of types '%s'..." %
                 utils.CommaJoin(set(d.dev_type for d in old_disks)))
-    RemoveDisks(self, self.instance, disk_types=[old_disk_template],
+    RemoveDisks(self, self.instance, disk_types=[d.dev_type for d in old_disks],
                 disks=old_disks)
 
     # Node resource locks will be released by the caller.
