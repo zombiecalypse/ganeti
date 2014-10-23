@@ -925,8 +925,6 @@ class KVMHypervisor(hv_base.BaseHypervisor):
                                       kvmhelp, devlist):
     """Generate KVM options regarding instance's block devices.
 
-    @type instance: L{objects.Instance}
-    @param instance: the instance object
     @type up_hvp: dict
     @param up_hvp: the instance's runtime hypervisor parameters
     @type kvm_disks: list of tuples

@@ -290,8 +290,8 @@ def RemoveDisks(lu, instance, disk_types=None, disks=None,
   @param lu: the logical unit on whose behalf we execute
   @type instance: L{objects.Instance}
   @param instance: the instance whose disks we should remove
-  @type disk_template: dict of uuid to string
-  @param disk_template: if passed, overrides the disk's type
+  @type disk_templates: dict of uuid to string
+  @param disk_templates: if passed, overrides the disk's type
   @type disks: list of L{objects.Disk}
   @param disks: the disks to remove; if not specified, all the disks of the
           instance are removed
