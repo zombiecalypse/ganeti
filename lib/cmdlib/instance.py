@@ -3846,7 +3846,6 @@ class LUInstanceSetParams(LogicalUnit):
           self.cfg.ReleaseDRBDMinors(self.instance.uuid)
           result.Raise("Error while converting the instance's template")
 
-
     for tcp_port in cleanup_ports:
       self.cfg.AddTcpUdpPort(tcp_port)
 
@@ -4299,7 +4298,7 @@ class LUInstanceSetParams(LogicalUnit):
             constants.DT_PLAIN in dev_types):
           self._ConvertPlainToDrbd(feedback_fn)
         elif (self.op.disk_template == constants.DT_PLAIN and
-            constants.DT_DRBD8 in dev_types):
+              constants.DT_DRBD8 in dev_types):
           self._ConvertDrbdToPlain(feedback_fn)
         self._ConvertInstanceTemplate(feedback_fn)
       except:

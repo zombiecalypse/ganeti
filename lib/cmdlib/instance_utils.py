@@ -272,6 +272,7 @@ def _RemovesAllDisksOfType(all_disks, disks, dev_type):
   removed = set(d.uuid for d in disks if d.dev_type == dev_type)
   return removed and not (before - removed)
 
+
 def RemoveDisks(lu, instance, disk_types=None, disks=None,
                 target_node_uuid=None, ignore_failures=False):
   """Remove all or a subset of disks for an instance.
@@ -289,7 +290,7 @@ def RemoveDisks(lu, instance, disk_types=None, disks=None,
   @param lu: the logical unit on whose behalf we execute
   @type instance: L{objects.Instance}
   @param instance: the instance whose disks we should remove
-  @type disk_templates: dict of uuid to string
+  @type disk_template: dict of uuid to string
   @param disk_template: if passed, overrides the disk's type
   @type disks: list of L{objects.Disk}
   @param disks: the disks to remove; if not specified, all the disks of the

@@ -921,7 +921,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
         data.append(info)
     return data
 
-  def _GenerateKVMBlockDevicesOptions(self, instance, up_hvp, kvm_disks,
+  def _GenerateKVMBlockDevicesOptions(self, up_hvp, kvm_disks,
                                       kvmhelp, devlist):
     """Generate KVM options regarding instance's block devices.
 
@@ -1699,8 +1699,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
         continue
       self._ConfigureNIC(instance, nic_seq, nic, taps[nic_seq])
 
-    bdev_opts = self._GenerateKVMBlockDevicesOptions(instance,
-                                                     up_hvp,
+    bdev_opts = self._GenerateKVMBlockDevicesOptions(up_hvp,
                                                      kvm_disks,
                                                      kvmhelp,
                                                      devlist)

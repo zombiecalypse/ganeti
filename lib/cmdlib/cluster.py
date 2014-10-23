@@ -1154,7 +1154,7 @@ class LUClusterSetParams(LogicalUnit):
                          if d.dev_type == disk_template]
       if disks_with_type:
         instance_uuids = [self.cfg.GetInstanceForDisk(d.uuid)
-                     for d in disks_with_type]
+                          for d in disks_with_type]
         instances = [self.cfg.GetInstanceInfo(uuid) for uuid in instance_uuids]
         instance_desc = [("on " + inst.name) if inst else "detached"
                          for inst in instances]
