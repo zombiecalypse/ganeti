@@ -955,8 +955,8 @@ class TestApplyContainerMods(unittest.TestCase):
   def testEmptyContainer(self):
     container = []
     chgdesc = []
-    instance_utils.ApplyContainerMods("test", container, chgdesc, [], None, None,
-                                      None)
+    instance_utils.ApplyContainerMods("test", container, chgdesc, [], None,
+                                      None, None)
     self.assertEqual(container, [])
     self.assertEqual(chgdesc, [])
 
