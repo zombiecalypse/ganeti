@@ -478,6 +478,7 @@ cmdlib_PYTHON = \
 	lib/cmdlib/instance_operation.py \
 	lib/cmdlib/instance_query.py \
 	lib/cmdlib/instance_storage.py \
+	lib/cmdlib/instance_set_params.py \
 	lib/cmdlib/instance_utils.py \
 	lib/cmdlib/misc.py \
 	lib/cmdlib/network.py \
