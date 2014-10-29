@@ -1290,7 +1290,7 @@ class ExportInstanceHelper(object):
 
     self._feedback_fn("Finalizing export on %s" % dest_node.name)
     result = self._lu.rpc.call_finalize_export(dest_node.uuid, instance,
-                                               self._snap_disks)
+                                               self._snap_disks.values())
     msg = result.fail_msg
     fin_resu = not msg
     if msg:

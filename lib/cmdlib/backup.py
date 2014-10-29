@@ -278,13 +278,6 @@ class LUBackupExport(LogicalUnit):
       raise errors.ProgrammerError("Unhandled export mode %r" %
                                    self.op.mode)
 
-    # instance disk type verification
-    # TODO: Implement export support for file-based disks
-    for disk in self.cfg.GetInstanceDisks(self.instance.uuid):
-      if disk.dev_type in constants.DTS_FILEBASED:
-        raise errors.OpPrereqError("Export not supported for instances with"
-                                   " file-based disks", errors.ECODE_INVAL)
-
     # Check prerequisites for zeroing
     if self.op.zero_free_space:
       # Check that user shutdown detection has been enabled
