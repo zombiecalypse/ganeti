@@ -1218,3 +1218,54 @@ def ComputeNics(op, cluster, default_ip, cfg, ec_id):
     nics.append(nic_obj)
 
   return nics
+
+
+def AllDisksOfType(disks_info, dev_types):
+  """Checks if the instance has only disks of type dev_type.
+
+  @type disks_info: list of L{Disk}
+  @param disks_info: all the disks of the instance.
+  @type dev_types: list of disk templates or disk template
+  @param dev_types: the disk type required.
+
+  @rtype: bool
+  @return: True iff the instance only has disks of type dev_type.
+  """
+
+  if isinstance(dev_types, str):
+    return AllDisksOfType(disks_info, [dev_types])
+
+  if not disks_info and constants.DT_DISKLESS not in dev_types:
+    return False
+
+  for disk in disks_info:
+    if disk.dev_type not in dev_types:
+      return False
+
+  return True
+
+
+def AnyDisksOfType(disks_info, dev_types):
+  """Checks if the instance has some disks of any types in dev_types.
+
+  @type disks_info: list of L{Disk}
+  @param disks_info: all the disks of the instance.
+  @type dev_types: list of disk template or disk template
+  @param dev_types: the disk type required.
+
+  @rtype: bool
+  @return: True if the instance has disks of type dev_types or the instance has
+    no disks and the dev_types allow DT_DISKLESS.
+  """
+
+  if isinstance(dev_types, str):
+    return AnyDisksOfType(disks_info, [dev_types])
+
+  if not disks_info and constants.DT_DISKLESS in dev_types:
+    return True
+
+  for disk in disks_info:
+    if disk.dev_type in dev_types:
+      return True
+
+  return False
