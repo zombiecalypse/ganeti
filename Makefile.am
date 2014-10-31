@@ -203,6 +203,7 @@ DIRS = \
 	lib/build \
 	lib/client \
 	lib/cmdlib \
+	lib/cmdlib/cluster \
 	lib/confd \
 	lib/jqueue \
 	lib/http \
@@ -470,7 +471,8 @@ cmdlib_PYTHON = \
 	lib/cmdlib/__init__.py \
 	lib/cmdlib/backup.py \
 	lib/cmdlib/base.py \
-	lib/cmdlib/cluster.py \
+	lib/cmdlib/cluster/__init__.py \
+	lib/cmdlib/cluster/verify.py \
 	lib/cmdlib/common.py \
 	lib/cmdlib/group.py \
 	lib/cmdlib/instance.py \
