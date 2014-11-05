@@ -148,6 +148,48 @@ class TestConfigRunner(unittest.TestCase):
     self.assertEqual(all_nodes[0], iobj.primary_node,
                      msg="Primary node not first node in list")
 
+  def testDisksInfo(self):
+    """Check if the GetDiskInfo function works as intented."""
+    # Create mock config writer
+    cfg = self._get_object_mock()
+
+    # Construct instance and add a plain disk
+    inst = self._create_instance(cfg)
+    cfg.AddInstance(inst, "my-job")
+    disk = objects.Disk(dev_type=constants.DT_PLAIN, size=128,
+                        logical_id=("myxenvg", "disk25494"), uuid="disk0",
+                        name="name0")
+    cfg.AddInstanceDisk(inst.uuid, disk)
+
+    # Test 1 - Search this disk by UUID
+    result = cfg.GetDiskInfo("disk0")
+    self.assertEqual(disk, result)
+
+    # Test 2 - Search this disk by name
+    result = cfg.GetDiskInfoByName("name0")
+    self.assertEqual(disk, result)
+
+    # Test 3 - Search this disk by wrong UUID and check that 'None' is returned
+    result = cfg.GetDiskInfo("disk1134")
+    self.assertEqual(None, result)
+
+    # Test 4 - Search this disk by wrong name and check that 'None' is returned
+    result = cfg.GetDiskInfoByName("name1134")
+    self.assertEqual(None, result)
+
+    # Test 5 - Add an extra disk with different UUID but same name. Then,
+    # search for a disk with that name and assert that we raise an exception
+    # about two disks with the same name.
+    disk = objects.Disk(dev_type=constants.DT_PLAIN, size=128,
+                        logical_id=("myxenvg", "disk25494"), uuid="disk1",
+                        name="name0")
+    cfg.AddInstanceDisk(inst.uuid, disk)
+
+    with self.assertRaises(errors.ConfigurationError) as cm:
+      cfg.GetDiskInfoByName("name0")
+    self.assertEqual(cm.exception.message, "There are 2 disks with this name:"
+                     " name0")
+
   def testInstNodesNoDisks(self):
     """Test all_nodes/secondary_nodes when there are no disks"""
     # construct instance
