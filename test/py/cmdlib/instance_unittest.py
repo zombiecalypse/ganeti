@@ -958,6 +958,60 @@ class TestCheckTargetNodeIPolicy(TestLUInstanceCreate):
     self.mcpu.assertLogContainsRegex(msg)
 
 
+class TestIndexOperations(unittest.TestCase):
+
+  """Test if index operations on containers work as expected."""
+
+  def testGetIndexFromIdentifier(self):
+    """Test if an identifier is correctly translated to a container index."""
+    container = []
+
+    # Check if -1 is translated to tail index
+    idx = instance_utils.GetIndexFromIdentifier("-1", "test", container)
+    self.assertEqual(0, idx)
+
+    idx = instance_utils.GetIndexFromIdentifier("0", "test", container)
+    self.assertEqual(0, idx)
+
+    # Check if wrong input raises an exception
+    with self.assertRaises(errors.OpPrereqError) as cm:
+      instance_utils.GetIndexFromIdentifier("lala", "test", container)
+    self.assertEqual(cm.exception[0], "Only positive integer or -1 is"
+                     " accepted as identifier for add/attach")
+    self.assertEqual(cm.exception[1], "wrong_input")
+
+    # Check for off-by-one errors
+    with self.assertRaises(IndexError) as cm:
+      instance_utils.GetIndexFromIdentifier("1", "test", container)
+    self.assertEqual(cm.exception.message, "Got test index 1, but there are"
+                     " only 0")
+
+    # Check if large negative numbers raise exception
+    with self.assertRaises(IndexError) as cm:
+      instance_utils.GetIndexFromIdentifier("-1134", "test", container)
+    self.assertEqual(cm.exception.message, "Not accepting negative indices"
+                     " other than -1")
+
+  def testInsertItemtoIndex(self):
+    """Test if we can insert an item to a container at a specified index."""
+    container = []
+
+    instance_utils.InsertItemToIndex(0, 2, container)
+    self.assertEqual([2], container)
+
+    instance_utils.InsertItemToIndex(0, 1, container)
+    self.assertEqual([1, 2], container)
+
+    instance_utils.InsertItemToIndex(-1, 3, container)
+    self.assertEqual([1, 2, 3], container)
+
+    self.assertRaises(AssertionError, instance_utils.InsertItemToIndex, -2,
+                      1134, container)
+
+    self.assertRaises(AssertionError, instance_utils.InsertItemToIndex, 4, 1134,
+                      container)
+
+
 class TestApplyContainerMods(unittest.TestCase):
   def testEmptyContainer(self):
     container = []
