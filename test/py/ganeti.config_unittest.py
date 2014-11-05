@@ -661,6 +661,60 @@ class TestConfigRunner(unittest.TestCase):
     cfg.RemoveNodeFromCandidateCerts(node_uuid, warn_fn=None)
     self.assertEqual(0, len(cfg.GetCandidateCerts()))
 
+  def testAttachDetachDisks(self):
+    """Test if the attach/detach wrappers work properly."""
+    # construct instance
+    cfg = self._get_object_mock()
+    inst = self._create_instance(cfg)
+    disk = objects.Disk(dev_type=constants.DT_PLAIN, size=128,
+                        logical_id=("myxenvg", "disk25494"), uuid="disk0")
+    fake_disk = objects.Disk(dev_type=constants.DT_PLAIN, size=128,
+                             logical_id=("myxenvg", "disk25494"), uuid="disk1")
+    cfg.AddInstance(inst, "my-job")
+    cfg.AddInstanceDisk(inst.uuid, disk)
+
+    # Test 1a - Detach disk from non-existent instance
+    with self.assertRaises(errors.ConfigurationError) as cm:
+      cfg.DetachInstanceDisk("1134", "disk0")
+    self.assertEqual(cm.exception.message, "Instance 1134 doesn't exist")
+
+    # Test 1b - Detach non-existent disk
+    with self.assertRaises(errors.ConfigurationError) as cm:
+      cfg.DetachInstanceDisk("test-uuid", "disk1")
+    self.assertEqual(cm.exception.message, "Disk disk1 doesn't exist")
+
+    # Test 1c - Detach disk
+    cfg.DetachInstanceDisk("test-uuid", "disk0")
+    instance_disks = cfg.GetInstanceDisks("test-uuid")
+    self.assertEqual(instance_disks, [])
+
+    # Test 1d - Detach disk again
+    with self.assertRaises(errors.ProgrammerError) as cm:
+      cfg.DetachInstanceDisk("test-uuid", "disk0")
+    self.assertEqual(cm.exception.message, "Disk disk0 is not attached to an"
+                     " instance")
+
+    # Test 2a - Attach disk to non-existent instance
+    with self.assertRaises(errors.ConfigurationError) as cm:
+      cfg.AttachInstanceDisk("1134", disk)
+    self.assertEqual(cm.exception.message, "Instance 1134 doesn't exist")
+
+    # Test 2b - Attach non-existent disk
+    with self.assertRaises(errors.ConfigurationError) as cm:
+      cfg.AttachInstanceDisk("test-uuid", fake_disk)
+    self.assertEqual(cm.exception.message, "Disk disk1 doesn't exist")
+
+    # Test 2c - Attach disk
+    cfg.AttachInstanceDisk("test-uuid", disk)
+    instance_disks = cfg.GetInstanceDisks("test-uuid")
+    self.assertEqual(instance_disks, [disk])
+
+    # Test 2d - Attach disk again
+    with self.assertRaises(errors.ReservationError) as cm:
+      cfg.AttachInstanceDisk("test-uuid", disk)
+    self.assertEqual(cm.exception.message, "Disk disk0 already attached to"
+                     " instance test.example.com")
+
 
 def _IsErrorInList(err_str, err_list):
   return any(map(lambda e: err_str in e, err_list))
