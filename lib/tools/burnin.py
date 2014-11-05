@@ -37,6 +37,8 @@ import optparse
 import time
 import socket
 import urllib
+import random
+import string # pylint: disable=W0402
 from itertools import izip, islice, cycle
 from cStringIO import StringIO
 
@@ -128,6 +130,10 @@ def Err(msg, exit_code=1):
   sys.stderr.write(msg + "\n")
   sys.stderr.flush()
   sys.exit(exit_code)
+
+
+def RandomString(size=8, chars=string.ascii_uppercase + string.digits):
+  return ''.join(random.choice(chars) for x in range(size))
 
 
 class SimpleOpener(urllib.FancyURLopener):
@@ -329,6 +335,7 @@ class Burner(object):
     self.hvp = self.bep = None
     self.ParseOptions()
     self.cl = cli.GetClient()
+    self.disk_nodes = {}
     self.GetState()
 
   def ClearFeedbackBuf(self):
@@ -597,6 +604,16 @@ class Burner(object):
     self.hv_can_migrate = \
       hypervisor.GetHypervisorClass(self.hypervisor).CAN_MIGRATE
 
+  def FindMatchingDisk(self, instance, disks):
+    """Find a disk whose nodes match the instance's disk nodes."""
+    instance_nodes = self.disk_nodes[instance]
+    for disk, disk_nodes in disks.iteritems():
+      if set(instance_nodes) == set(disk_nodes):
+        # Erase that disk from the dictionary so that we don't pick it again.
+        del disks[disk]
+        return disk
+    Err("Couldn't find matching detached disk for instance %s" % instance)
+
   @_DoCheckInstances
   @_DoBatch(False)
   def BurnCreateInstances(self):
@@ -622,6 +639,15 @@ class Burner(object):
 
       Log(msg, indent=2)
 
+      # Calculate the disk nodes for the instance based on the disk template.
+      if self.opts.disk_template in constants.DTS_EXT_MIRROR:
+        nodes = []
+      elif self.opts.disk_template in constants.DTS_INT_MIRROR:
+        nodes = [pnode, snode]
+      else:
+        nodes = [pnode]
+      self.disk_nodes[instance] = nodes
+
       op = opcodes.OpInstanceCreate(instance_name=instance,
                                     disks=[{"size": size}
                                            for size in self.disk_size],
@@ -645,6 +671,64 @@ class Burner(object):
                                     )
       remove_instance = lambda name: lambda: self.to_rem.append(name)
       self.ExecOrQueue(instance, [op], post_process=remove_instance(instance))
+
+  @_DoCheckInstances
+  @_DoBatch(False)
+  def BurnAddDisks(self):
+    """Add an extra disk to every instance and then detach it."""
+    Log("Adding and detaching disks")
+
+    # Temporary dict that keeps the generated disk names and their nodes.
+    self._disks = {}
+
+    # Iterate all instances, start them, add a disk with a unique name and
+    # detach it. Do all disk operations with hotplugging (if possible).
+    for instance in self.instances:
+      Log("instance %s", instance, indent=1)
+      disk_name = RandomString()
+      self._disks[disk_name] = self.disk_nodes[instance]
+      op_stop = self.StopInstanceOp(instance)
+      op_add = opcodes.OpInstanceSetParams(
+        instance_name=instance, hotplug_if_possible=True,
+        disks=[(constants.DDM_ADD, {"size": self.disk_size[0],
+                                    "name": disk_name})])
+      op_detach = opcodes.OpInstanceSetParams(
+        instance_name=instance, hotplug_if_possible=True,
+        disks=[(constants.DDM_DETACH, {})])
+      op_start = self.StartInstanceOp(instance)
+      Log("adding a disk with name %s" % disk_name, indent=2)
+      Log("detaching last disk", indent=2)
+      self.ExecOrQueue(instance, [op_start, op_add, op_detach, op_stop,
+                                  op_start])
+
+  @_DoCheckInstances
+  @_DoBatch(False)
+  def BurnRemoveDisks(self):
+    """Attach a previously detached disk to an instance and then remove it."""
+    Log("Attaching and removing disks")
+
+    # Iterate all instances in random order, attach the detached disks, remove
+    # them and then restart the instances. Do all disk operation with
+    # hotplugging (if possible).
+    instances_copy = list(self.instances)
+    random.shuffle(instances_copy)
+    for instance in instances_copy:
+      disk_name = self.FindMatchingDisk(instance, self._disks)
+      op_attach = opcodes.OpInstanceSetParams(
+        instance_name=instance, hotplug_if_possible=True,
+        disks=[(constants.DDM_ATTACH, {"name": disk_name})])
+      op_rem = opcodes.OpInstanceSetParams(
+        instance_name=instance, hotplug_if_possible=True,
+        disks=[(constants.DDM_REMOVE, {})])
+      op_stop = self.StopInstanceOp(instance)
+      op_start = self.StartInstanceOp(instance)
+      Log("attaching a disk with name %s" % disk_name, indent=2)
+      Log("removing last disk", indent=2)
+      self.ExecOrQueue(instance, [op_attach, op_rem, op_stop, op_start])
+
+    # Disk nodes are useful only for this test.
+    delattr(self, "disk_nodes")
+    delattr(self, "_disks")
 
   @_DoBatch(False)
   def BurnModifyRuntimeMemory(self):
@@ -942,24 +1026,6 @@ class Burner(object):
       Log("deactivate disks (when offline)", indent=2)
       self.ExecOrQueue(instance, [op_act, op_stop, op_act, op_deact, op_start])
 
-  @_DoCheckInstances
-  @_DoBatch(False)
-  def BurnAddRemoveDisks(self):
-    """Add and remove an extra disk for the instances."""
-    Log("Adding and removing disks")
-    for instance in self.instances:
-      Log("instance %s", instance, indent=1)
-      op_add = opcodes.OpInstanceSetParams(
-        instance_name=instance,
-        disks=[(constants.DDM_ADD, {"size": self.disk_size[0]})])
-      op_rem = opcodes.OpInstanceSetParams(
-        instance_name=instance, disks=[(constants.DDM_REMOVE, {})])
-      op_stop = self.StopInstanceOp(instance)
-      op_start = self.StartInstanceOp(instance)
-      Log("adding a disk", indent=2)
-      Log("removing last disk", indent=2)
-      self.ExecOrQueue(instance, [op_add, op_stop, op_rem, op_start])
-
   @_DoBatch(False)
   def BurnAddRemoveNICs(self):
     """Add, change and remove an extra NIC for the instances."""
@@ -1081,6 +1147,20 @@ class Burner(object):
     try:
       self.BurnCreateInstances()
 
+      if self.opts.do_startstop:
+        self.BurnStopStart()
+
+      # In lieu of a proper way to read the config, the BurnCreateInstances()
+      # function creates a mapping ('self.disk_nodes') between each instance
+      # and its disk nodes. This mapping is necessary for the add/remove test,
+      # in order to create pairs of instances and detached disks and test the
+      # attach functionality. However, since this mapping is static, some tests
+      # might change the actual instance nodes and render this mapping useless.
+      # Therefore, this test should run before any of these tests.
+      if self.opts.do_addremove_disks:
+        self.BurnAddDisks()
+        self.BurnRemoveDisks()
+
       if self.bep[constants.BE_MINMEM] < self.bep[constants.BE_MAXMEM]:
         self.BurnModifyRuntimeMemory()
 
@@ -1126,9 +1206,6 @@ class Burner(object):
       if self.opts.do_renamesame:
         self.BurnRenameSame(self.opts.name_check, self.opts.ip_check)
 
-      if self.opts.do_addremove_disks:
-        self.BurnAddRemoveDisks()
-
       default_nic_mode = self.cluster_default_nicparams[constants.NIC_MODE]
       # Don't add/remove nics in routed mode, as we would need an ip to add
       # them with
@@ -1146,9 +1223,6 @@ class Burner(object):
 
       if self.opts.do_confd_tests:
         self.BurnConfd()
-
-      if self.opts.do_startstop:
-        self.BurnStopStart()
 
       has_err = False
     finally:
