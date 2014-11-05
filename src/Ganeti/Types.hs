@@ -430,7 +430,9 @@ $(THH.makeJSONInstance ''CVErrorCode)
 -- | Dynamic device modification, just add/remove version.
 $(THH.declareLADT ''String "DdmSimple"
      [ ("DdmSimpleAdd",    "add")
+     , ("DdmSimpleAttach", "attach")
      , ("DdmSimpleRemove", "remove")
+     , ("DdmSimpleDetach", "detach")
      ])
 $(THH.makeJSONInstance ''DdmSimple)
 
@@ -439,7 +441,9 @@ $(THH.makeJSONInstance ''DdmSimple)
 -- TODO: DDM_SWAP, DDM_MOVE?
 $(THH.declareLADT ''String "DdmFull"
      [ ("DdmFullAdd",    "add")
+     , ("DdmFullAttach", "attach")
      , ("DdmFullRemove", "remove")
+     , ("DdmFullDetach", "detach")
      , ("DdmFullModify", "modify")
      ])
 $(THH.makeJSONInstance ''DdmFull)
