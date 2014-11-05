@@ -2235,6 +2235,12 @@ class TestLUInstanceSetParams(CmdlibTestCase):
                          nics=[(constants.DDM_ADD, -1, {})])
     self.ExecOpCode(op)
 
+  def testAttachNICs(self):
+    msg = "Attach operation is not supported for NICs"
+    op = self.CopyOpCode(self.op,
+                         nics=[(constants.DDM_ATTACH, -1, {})])
+    self.ExecOpCodeExpectOpPrereqError(op, msg)
+
   def testNoHotplugSupport(self):
     op = self.CopyOpCode(self.op,
                          nics=[(constants.DDM_ADD, -1, {})],
@@ -2377,6 +2383,12 @@ class TestLUInstanceSetParams(CmdlibTestCase):
                          nics=[(constants.DDM_REMOVE, 0, {})])
     self.ExecOpCode(op)
 
+  def testDetachNICs(self):
+    msg = "Detach operation is not supported for NICs"
+    op = self.CopyOpCode(self.op,
+                         nics=[(constants.DDM_DETACH, -1, {})])
+    self.ExecOpCodeExpectOpPrereqError(op, msg)
+
   def testHotRemoveNic(self):
     inst = self.cfg.AddNewInstance(nics=[self.cfg.CreateNic(),
                                          self.cfg.CreateNic()])
@@ -2425,6 +2437,15 @@ class TestLUInstanceSetParams(CmdlibTestCase):
     self.ExecOpCodeExpectException(
       op, errors.TypeEnforcementError, "is not a valid size")
 
+  def testAddDiskUnkownParam(self):
+    op = self.CopyOpCode(self.op,
+                         disks=[[constants.DDM_ADD, -1,
+                                 {
+                                   "uuid": "mock_uuid_1134"
+                                 }]])
+    self.ExecOpCodeExpectException(
+      op, errors.TypeEnforcementError, "Unknown parameter 'uuid'")
+
   def testAddDiskRunningInstanceNoWaitForSync(self):
     op = self.CopyOpCode(self.running_op,
                          disks=[[constants.DDM_ADD, -1,
@@ -2454,7 +2475,7 @@ class TestLUInstanceSetParams(CmdlibTestCase):
                          wait_for_sync=False)
     self.ExecOpCodeExpectOpPrereqError(
       op, "Can't add a disk to an instance with deactivated disks"
-          " and --no-wait-for-sync given.")
+          " and --no-wait-for-sync given")
 
   def testAddDiskRunningInstance(self):
     op = self.CopyOpCode(self.running_op,
@@ -2496,6 +2517,113 @@ class TestLUInstanceSetParams(CmdlibTestCase):
     self.assertTrue(self.rpc.call_blockdev_assemble.called)
     self.assertTrue(self.rpc.call_hotplug_device.called)
 
+  def testAttachDiskWrongParams(self):
+    msg = "Only one argument is permitted in attach op, either name or uuid"
+    self.cfg.AddOrphanDisk()
+    op = self.CopyOpCode(self.op,
+                         disks=[[constants.DDM_ATTACH, -1,
+                                 {
+                                   constants.IDISK_SIZE: 1134
+                                 }]],
+                         )
+    self.ExecOpCodeExpectOpPrereqError(op, msg)
+    op = self.CopyOpCode(self.op,
+                         disks=[[constants.DDM_ATTACH, -1,
+                                 {
+                                   'uuid': "1134",
+                                   constants.IDISK_NAME: "1134",
+                                 }]],
+                         )
+    self.ExecOpCodeExpectOpPrereqError(op, msg)
+    op = self.CopyOpCode(self.op,
+                         disks=[[constants.DDM_ATTACH, -1,
+                                 {
+                                   'uuid': "1134",
+                                   constants.IDISK_SIZE: 1134,
+                                 }]],
+                         )
+    self.ExecOpCodeExpectOpPrereqError(op, msg)
+
+  def testAttachDiskWrongTemplate(self):
+    msg = "Instance has '%s' template while disk has '%s' template" % \
+      (constants.DT_PLAIN, constants.DT_BLOCK)
+    self.cfg.AddOrphanDisk(name="mock_disk_1134", dev_type=constants.DT_BLOCK)
+    op = self.CopyOpCode(self.op,
+                         disks=[[constants.DDM_ATTACH, -1,
+                                 {
+                                   constants.IDISK_NAME: "mock_disk_1134"
+                                 }]],
+                         )
+    self.ExecOpCodeExpectOpPrereqError(op, msg)
+
+  def testAttachDiskWrongNodes(self):
+    msg = "Disk nodes are \['mock_node_1134'\]"
+
+    self.cfg.AddOrphanDisk(name="mock_disk_1134", primary_node="mock_node_1134")
+    op = self.CopyOpCode(self.op,
+                         disks=[[constants.DDM_ATTACH, -1,
+                                 {
+                                   constants.IDISK_NAME: "mock_disk_1134"
+                                 }]],
+                         )
+    self.ExecOpCodeExpectOpPrereqError(op, msg)
+
+  def testAttachDiskRunningInstanceNoWaitForSync(self):
+    self.cfg.AddOrphanDisk(name="mock_disk_1134")
+    op = self.CopyOpCode(self.running_op,
+                         disks=[[constants.DDM_ATTACH, -1,
+                                 {
+                                   constants.IDISK_NAME: "mock_disk_1134"
+                                 }]],
+                         wait_for_sync=False)
+    self.ExecOpCode(op)
+    self.assertFalse(self.rpc.call_blockdev_shutdown.called)
+
+  def testAttachDiskDownInstance(self):
+    self.cfg.AddOrphanDisk(name="mock_disk_1134")
+    op = self.CopyOpCode(self.op,
+                         disks=[[constants.DDM_ATTACH, -1,
+                                 {
+                                   constants.IDISK_NAME: "mock_disk_1134"
+                                 }]])
+    self.ExecOpCode(op)
+
+    self.assertTrue(self.rpc.call_blockdev_shutdown.called)
+
+  def testAttachDiskDownInstanceNoWaitForSync(self):
+    self.cfg.AddOrphanDisk(name="mock_disk_1134")
+    op = self.CopyOpCode(self.op,
+                         disks=[[constants.DDM_ATTACH, -1,
+                                 {
+                                   constants.IDISK_NAME: "mock_disk_1134"
+                                 }]],
+                         wait_for_sync=False)
+    self.ExecOpCodeExpectOpPrereqError(
+      op, "Can't attach a disk to an instance with deactivated disks"
+          " and --no-wait-for-sync given.")
+
+  def testHotAttachDisk(self):
+    self.cfg.AddOrphanDisk(name="mock_disk_1134")
+    self.rpc.call_blockdev_assemble.return_value = \
+      self.RpcResultsBuilder() \
+        .CreateSuccessfulNodeResult(self.master,
+                                    ("/dev/mocked_path",
+                                     "/var/run/ganeti/instance-disks/mocked_d",
+                                     None))
+    op = self.CopyOpCode(self.op,
+                         disks=[[constants.DDM_ATTACH, -1,
+                                 {
+                                   constants.IDISK_NAME: "mock_disk_1134"
+                                 }]],
+                         hotplug=True)
+    self.rpc.call_hotplug_supported.return_value = \
+      self.RpcResultsBuilder() \
+        .CreateSuccessfulNodeResult(self.master)
+    self.ExecOpCode(op)
+    self.assertTrue(self.rpc.call_hotplug_supported.called)
+    self.assertTrue(self.rpc.call_blockdev_assemble.called)
+    self.assertTrue(self.rpc.call_hotplug_device.called)
+
   def testHotRemoveDisk(self):
     inst = self.cfg.AddNewInstance(disks=[self.cfg.CreateDisk(),
                                           self.cfg.CreateDisk()])
@@ -2512,6 +2640,60 @@ class TestLUInstanceSetParams(CmdlibTestCase):
     self.assertTrue(self.rpc.call_hotplug_device.called)
     self.assertTrue(self.rpc.call_blockdev_shutdown.called)
     self.assertTrue(self.rpc.call_blockdev_remove.called)
+
+  def testHotDetachDisk(self):
+    inst = self.cfg.AddNewInstance(disks=[self.cfg.CreateDisk(),
+                                          self.cfg.CreateDisk()])
+    op = self.CopyOpCode(self.op,
+                         instance_name=inst.name,
+                         disks=[[constants.DDM_DETACH, -1,
+                                 {}]],
+                         hotplug=True)
+    self.rpc.call_hotplug_supported.return_value = \
+      self.RpcResultsBuilder() \
+        .CreateSuccessfulNodeResult(self.master)
+    self.ExecOpCode(op)
+    self.assertTrue(self.rpc.call_hotplug_supported.called)
+    self.assertTrue(self.rpc.call_hotplug_device.called)
+    self.assertTrue(self.rpc.call_blockdev_shutdown.called)
+
+  def testAttachDetachDisk(self):
+    """Check if the disks can be attached and detached in sequence.
+
+    Also, check if the operations succeed both with name and uuid.
+    """
+    inst = self.cfg.AddNewInstance(disks=[
+      self.cfg.CreateDisk(uuid="mock_uuid_1134"),
+      self.cfg.CreateDisk(name="mock_name_1134")
+    ])
+    disks = self.cfg.GetInstanceDisks(inst.uuid)
+    disks.reverse()
+
+    op = self.CopyOpCode(self.op,
+                         instance_name=inst.name,
+                         disks=[[constants.DDM_DETACH, "mock_uuid_1134",
+                                 {}]])
+    self.ExecOpCode(op)
+    op = self.CopyOpCode(self.op,
+                         instance_name=inst.name,
+                         disks=[[constants.DDM_ATTACH, 0,
+                                 {
+                                   'uuid': "mock_uuid_1134"
+                                 }]])
+    self.ExecOpCode(op)
+    op = self.CopyOpCode(self.op,
+                         instance_name=inst.name,
+                         disks=[[constants.DDM_DETACH, "mock_name_1134",
+                                 {}]])
+    self.ExecOpCode(op)
+    op = self.CopyOpCode(self.op,
+                         instance_name=inst.name,
+                         disks=[[constants.DDM_ATTACH, 0,
+                                 {
+                                   constants.IDISK_NAME: "mock_name_1134"
+                                 }]])
+    self.ExecOpCode(op)
+    self.assertEqual(disks, self.cfg.GetInstanceDisks(inst.uuid))
 
   def testModifyDiskWithSize(self):
     op = self.CopyOpCode(self.op,
