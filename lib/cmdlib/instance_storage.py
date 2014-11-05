@@ -1553,6 +1553,7 @@ def AssembleInstanceDisks(lu, instance, disks=None, ignore_secondaries=False,
   """
   device_info = []
   disks_ok = True
+  results = []
 
   if disks is None:
     # only mark instance disks as active if all disks are affected
@@ -1605,6 +1606,7 @@ def AssembleInstanceDisks(lu, instance, disks=None, ignore_secondaries=False,
         node_disk.UnsetSize()
       result = lu.rpc.call_blockdev_assemble(node_uuid, (node_disk, instance),
                                              instance, True, idx)
+      results.append(result)
       msg = result.fail_msg
       if msg:
         lu.LogWarning("Could not prepare block device %s on node %s"
@@ -1620,7 +1622,7 @@ def AssembleInstanceDisks(lu, instance, disks=None, ignore_secondaries=False,
   if not disks_ok:
     lu.cfg.MarkInstanceDisksInactive(instance.uuid)
 
-  return disks_ok, device_info
+  return disks_ok, device_info, results
 
 
 def StartInstanceDisks(lu, instance, force):
@@ -1630,8 +1632,8 @@ def StartInstanceDisks(lu, instance, force):
   instance configuration, if needed.
 
   """
-  disks_ok, _ = AssembleInstanceDisks(lu, instance,
-                                      ignore_secondaries=force)
+  disks_ok, _, _ = AssembleInstanceDisks(lu, instance,
+                                         ignore_secondaries=force)
   if not disks_ok:
     ShutdownInstanceDisks(lu, instance)
     if force is not None and not force:
@@ -1774,7 +1776,8 @@ class LUInstanceGrowDisk(LogicalUnit):
 
     wipe_disks = self.cfg.GetClusterInfo().prealloc_wipe_disks
 
-    disks_ok, _ = AssembleInstanceDisks(self, self.instance, disks=[self.disk])
+    disks_ok, _, _ = AssembleInstanceDisks(self, self.instance,
+                                           disks=[self.disk])
     if not disks_ok:
       raise errors.OpExecError("Cannot activate block device to grow")
 
@@ -2040,9 +2043,9 @@ class LUInstanceActivateDisks(NoHooksLU):
     """Activate the disks.
 
     """
-    disks_ok, disks_info = \
-              AssembleInstanceDisks(self, self.instance,
-                                    ignore_size=self.op.ignore_size)
+    disks_ok, disks_info, _ = AssembleInstanceDisks(
+      self, self.instance, ignore_size=self.op.ignore_size)
+
     if not disks_ok:
       raise errors.OpExecError("Cannot activate block devices")
 
