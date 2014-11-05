@@ -487,6 +487,35 @@ class ConfigWriter(object):
     """
     return self._UnlockedGetDiskInfo(disk_uuid)
 
+  def _UnlockedGetDiskList(self):
+    """Get the list of disks.
+
+    @return: array of disks, ex. ['disk2-uuid', 'disk1-uuid']
+
+    """
+    return self._ConfigData().disks.keys()
+
+  @_ConfigSync(shared=1)
+  def GetAllDisksInfo(self):
+    """Get the configuration of all disks.
+
+    This is a simple wrapper over L{_UnlockedGetAllDisksInfo}.
+
+    """
+    return self._UnlockedGetAllDisksInfo()
+
+  def _UnlockedGetAllDisksInfo(self):
+    """Get the configuration of all disks.
+
+    @rtype: dict
+    @return: dict of (disk, disk_info), where disk_info is what
+        would GetDiskInfo return for the node
+
+    """
+    my_dict = dict([(disk_uuid, self._UnlockedGetDiskInfo(disk_uuid))
+                    for disk_uuid in self._UnlockedGetDiskList()])
+    return my_dict
+
   def _AllInstanceNodes(self, inst_uuid):
     """Compute the set of all disk-related nodes for an instance.
 
