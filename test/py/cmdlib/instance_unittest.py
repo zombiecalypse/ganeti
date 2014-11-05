@@ -1021,77 +1021,82 @@ class TestApplyContainerMods(unittest.TestCase):
     self.assertEqual(container, [])
     self.assertEqual(chgdesc, [])
 
-  def testAdd(self):
-    container = []
-    chgdesc = []
-    mods = instance_utils.PrepareContainerMods([
-      (constants.DDM_ADD, -1, "Hello"),
-      (constants.DDM_ADD, -1, "World"),
-      (constants.DDM_ADD, 0, "Start"),
-      (constants.DDM_ADD, -1, "End"),
-      ], None)
-instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
-                                  None, None, None, None, None)
-    self.assertEqual(container, ["Start", "Hello", "World", "End"])
-    self.assertEqual(chgdesc, [])
-
-    mods = instance_utils.PrepareContainerMods([
-      (constants.DDM_ADD, 0, "zero"),
-      (constants.DDM_ADD, 3, "Added"),
-      (constants.DDM_ADD, 5, "four"),
-      (constants.DDM_ADD, 7, "xyz"),
-      ], None)
-instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
-                                  None, None, None, None, None)
-    self.assertEqual(container,
-                     ["zero", "Start", "Hello", "Added", "World", "four",
-                      "End", "xyz"])
-    self.assertEqual(chgdesc, [])
-
-    for idx in [-2, len(container) + 1]:
+  def testAddAttach(self):
+    for op in (constants.DDM_ADD, constants.DDM_ATTACH):
+      container = []
+      chgdesc = []
       mods = instance_utils.PrepareContainerMods([
-        (constants.DDM_ADD, idx, "error"),
+        (op, -1, "Hello"),
+        (op, -1, "World"),
+        (op, 0, "Start"),
+        (op, -1, "End"),
         ], None)
-      self.assertRaises(IndexError, instance_utils.ApplyContainerMods,
-                        "test", container, None, mods, None, None, None, None,
-                        None)
+      instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
+                                   None, None, None, None, None)
+      self.assertEqual(container, ["Start", "Hello", "World", "End"])
+      self.assertEqual(chgdesc, [])
 
-  def testRemoveError(self):
+      mods = instance_utils.PrepareContainerMods([
+        (op, 0, "zero"),
+        (op, 3, "Added"),
+        (op, 5, "four"),
+        (op, 7, "xyz"),
+        ], None)
+      instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
+                                   None, None, None, None, None)
+      self.assertEqual(container,
+                       ["zero", "Start", "Hello", "Added", "World", "four",
+                        "End", "xyz"])
+      self.assertEqual(chgdesc, [])
+
+      for idx in [-2, len(container) + 1]:
+        mods = instance_utils.PrepareContainerMods([
+          (op, idx, "error"),
+          ], None)
+        self.assertRaises(IndexError, instance_utils.ApplyContainerMods,
+                          "test", container, None, mods, None, None, None, None,
+                          None)
+
+  def testRemoveDetachError(self):
     for idx in [0, 1, 2, 100, -1, -4]:
+      for op in (constants.DDM_REMOVE, constants.DDM_DETACH):
+        mods = instance_utils.PrepareContainerMods([
+          (op, idx, None),
+          ], None)
+        self.assertRaises(IndexError, instance_utils.ApplyContainerMods,
+                          "test", [], None, mods, None, None, None, None, None)
+
+    for op in (constants.DDM_REMOVE, constants.DDM_DETACH):
       mods = instance_utils.PrepareContainerMods([
-        (constants.DDM_REMOVE, idx, None),
+        (op, 0, object()),
         ], None)
-      self.assertRaises(IndexError, instance_utils.ApplyContainerMods,
-                        "test", [], None, mods, None, None, None, None, None)
+      self.assertRaises(AssertionError, instance_utils.ApplyContainerMods,
+                        "test", [""], None, mods, None, None, None, None, None)
 
-    mods = instance_utils.PrepareContainerMods([
-      (constants.DDM_REMOVE, 0, object()),
-      ], None)
-    self.assertRaises(AssertionError, instance_utils.ApplyContainerMods,
-                      "test", [""], None, mods, None, None, None, None, None)
-
-  def testAddError(self):
+  def testAddAttachError(self):
     for idx in range(-100, -1) + [100]:
-      mods = instance_utils.PrepareContainerMods([
-        (constants.DDM_ADD, idx, None),
-        ], None)
-      self.assertRaises(IndexError, instance_utils.ApplyContainerMods,
-                        "test", [], None, mods, None, None, None, None, None)
+      for op in (constants.DDM_ADD, constants.DDM_ATTACH):
+        mods = instance_utils.PrepareContainerMods([
+          (op, idx, None),
+          ], None)
+        self.assertRaises(IndexError, instance_utils.ApplyContainerMods,
+                          "test", [], None, mods, None, None, None, None, None)
 
-  def testRemove(self):
-    container = ["item 1", "item 2"]
-    mods = instance_utils.PrepareContainerMods([
-      (constants.DDM_ADD, -1, "aaa"),
-      (constants.DDM_REMOVE, -1, None),
-      (constants.DDM_ADD, -1, "bbb"),
-      ], None)
-    chgdesc = []
-instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
-                                  None, None, None, None, None)
-    self.assertEqual(container, ["item 1", "item 2", "bbb"])
-    self.assertEqual(chgdesc, [
-      ("test/2", "remove"),
-      ])
+  def testRemoveDetach(self):
+    for op in (constants.DDM_REMOVE, constants.DDM_DETACH):
+      container = ["item 1", "item 2"]
+      mods = instance_utils.PrepareContainerMods([
+        (constants.DDM_ADD, -1, "aaa"),
+        (op, -1, None),
+        (constants.DDM_ADD, -1, "bbb"),
+        ], None)
+      chgdesc = []
+      instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
+                                   None, None, None, None, None)
+      self.assertEqual(container, ["item 1", "item 2", "bbb"])
+      self.assertEqual(chgdesc, [
+        ("test/2", op),
+        ])
 
   def testModify(self):
     container = ["item 1", "item 2"]
@@ -1101,8 +1106,8 @@ instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
       (constants.DDM_MODIFY, 1, "c"),
       ], None)
     chgdesc = []
-instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
-                                  None, None, None, None, None)
+    instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
+                                      None, None, None, None, None)
     self.assertEqual(container, ["item 1", "item 2"])
     self.assertEqual(chgdesc, [])
 
@@ -1122,6 +1127,13 @@ instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
       ])
 
   @staticmethod
+  def _AttachTestFn(idx, params, private):
+    private.data = ("attach", idx, params)
+    return ((100 * idx, params), [
+      ("test/%s" % idx, hex(idx)),
+      ])
+
+  @staticmethod
   def _ModifyTestFn(idx, item, params, private):
     private.data = ("modify", idx, params)
     return [
@@ -1131,6 +1143,10 @@ instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
   @staticmethod
   def _RemoveTestFn(idx, item, private):
     private.data = ("remove", idx, item)
+
+  @staticmethod
+  def _DetachTestFn(idx, item, private):
+    private.data = ("detach", idx, item)
 
   def testAddWithCreateFunction(self):
     container = []
@@ -1144,14 +1160,17 @@ instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
       (constants.DDM_MODIFY, -1, "foobar"),
       (constants.DDM_REMOVE, 2, None),
       (constants.DDM_ADD, 1, "More"),
+      (constants.DDM_DETACH, -1, None),
+      (constants.DDM_ATTACH, 0, "Hello"),
       ], mock.Mock)
     instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
-                                      self._CreateTestFn, None, self._ModifyTestFn,
-                                      self._RemoveTestFn, None)
+                                      self._CreateTestFn, self._AttachTestFn,
+                                      self._ModifyTestFn, self._RemoveTestFn,
+                                      self._DetachTestFn)
     self.assertEqual(container, [
+      (000, "Hello"),
       (000, "Start"),
       (100, "More"),
-      (000, "Hello"),
       ])
     self.assertEqual(chgdesc, [
       ("test/0", "0x0"),
@@ -1161,7 +1180,9 @@ instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
       ("test/2", "remove"),
       ("test/2", "modify foobar"),
       ("test/2", "remove"),
-      ("test/1", "0x1")
+      ("test/1", "0x1"),
+      ("test/2", "detach"),
+      ("test/0", "0x0"),
       ])
     self.assertTrue(compat.all(op == private.data[0]
                                for (op, _, _, private) in mods))
@@ -1174,6 +1195,8 @@ instance_utils.ApplyContainerMods("test", container, chgdesc, mods,
       ("modify", 2, "foobar"),
       ("remove", 2, (300, "End")),
       ("add", 1, "More"),
+      ("detach", 2, (000, "Hello")),
+      ("attach", 0, "Hello"),
       ])
 
 
