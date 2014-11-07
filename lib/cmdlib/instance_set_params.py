@@ -1530,11 +1530,7 @@ class LUInstanceSetParams(LogicalUnit):
       msg += "done"
     return msg
 
-  def _CreateNewDisk(self, idx, params, _):
-    """Creates a new disk.
-
-    """
-    # add a new disk
+  def _GenerateDiskTemplateWrapper(self, idx, params):
     instance_disks = self.cfg.GetInstanceDisks(self.instance.uuid)
     if self.instance.disk_template in constants.DTS_FILEBASED:
       (file_driver, file_path) = instance_disks[0].logical_id
@@ -1543,12 +1539,18 @@ class LUInstanceSetParams(LogicalUnit):
       file_driver = file_path = None
 
     secondary_nodes = self.cfg.GetInstanceSecondaryNodes(self.instance.uuid)
-    disk = \
+    return \
       GenerateDiskTemplate(self, self.instance.disk_template,
                            self.instance.uuid, self.instance.primary_node,
                            secondary_nodes, [params], file_path,
                            file_driver, idx, self.Log, self.diskparams)[0]
 
+  def _CreateNewDisk(self, idx, params, _):
+    """Creates a new disk.
+
+    """
+    # add a new disk
+    disk = self._GenerateDiskTemplateWrapper(idx, params)
     new_disks = CreateDisks(self, self.instance, disks=[disk])
     self.cfg.AddInstanceDisk(self.instance.uuid, disk, idx)
 
