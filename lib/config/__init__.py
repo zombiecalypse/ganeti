@@ -2276,6 +2276,18 @@ class ConfigWriter(object):
     """
     self._UnlockedGetDiskInfo(disk_uuid).nodes = nodes
 
+  @_ConfigSync()
+  def SetDiskLogicalID(self, disk_uuid, logical_id):
+    """Sets the logical_id of an existing disk
+
+    @param disk_uuid: disk UUID
+    @type disk_uuid: string
+    @param logical_id: the new logical_id for the disk
+    @type logical_id: tuple
+
+    """
+    self._UnlockedGetDiskInfo(disk_uuid).logical_id = logical_id
+
   def _UnlockedGetInstanceNames(self, inst_uuids):
     return [self._UnlockedGetInstanceName(uuid) for uuid in inst_uuids]
 
