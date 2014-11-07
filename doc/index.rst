@@ -102,6 +102,7 @@ Draft designs
    design-daemons.rst
    design-disks.rst
    design-file-based-storage.rst
+   design-file-based-disks-ownership.rst
    design-hroller.rst
    design-hotplug.rst
    design-internal-shutdown.rst
