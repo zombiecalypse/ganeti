@@ -821,6 +821,6 @@ class ConfigMock(config.ConfigWriter):
     instance.serial_no = 1
     instance.ctime = instance.mtime = time.time()
     self._ConfigData().instances[instance.uuid] = instance
-    self._ConfigData().cluster.serial_no += 1
+    self._ConfigData().cluster.serial_no += 1 # pylint: disable=E1103
     self._UnlockedReleaseDRBDMinors(instance.uuid)
     self._UnlockedCommitTemporaryIps(ec_id)
