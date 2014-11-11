@@ -1766,6 +1766,7 @@ python_tests = \
 	test/py/cmdlib/instance_migration_unittest.py \
 	test/py/cmdlib/instance_query_unittest.py \
 	test/py/cmdlib/instance_storage_unittest.py \
+	test/py/cmdlib/instance_utils_unittest.py \
 	test/py/cmdlib/node_unittest.py \
 	test/py/cmdlib/test_unittest.py \
 	test/py/cfgupgrade_unittest.py \
