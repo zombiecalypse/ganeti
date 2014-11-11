@@ -688,7 +688,7 @@ def AnnotateDiskParams(disks, disk_params):
   """
   def AnnotateDisk(disk):
     if disk.dev_type == constants.DT_DISKLESS:
-      return disk
+      raise errors.ProgrammerError("Found 'diskless' disk: %s" % disk)
 
     ld_params = objects.Disk.ComputeLDParams(disk.dev_type, disk_params)
 
