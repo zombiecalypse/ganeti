@@ -2692,10 +2692,10 @@ class TestLUInstanceSetParams(CmdlibTestCase):
     new_path = os.path.join(os.path.dirname(storage_path), disk_name)
 
     # Create a file-based instance
+    disks = [self.cfg.CreateDisk(dev_type=constants.DT_FILE), mock_disk]
     inst = self.cfg.AddNewInstance(name='mock_instance_1134',
                                    disk_template=constants.DT_FILE,
-                                   disks=[self.cfg.CreateDisk(dev_type=constants.DT_FILE),
-                                          mock_disk],
+                                   disks=disks,
                                    )
 
     # Detach the disk and assert that it has been moved to the upper directory
