@@ -137,30 +137,33 @@ iterateDepth :: Bool             -- ^ Whether to print moves
              -> Score            -- ^ Score at which to stop
              -> IO (Cluster.Table, [MoveJob]) -- ^ The resulting table
                                               -- and commands
-iterateDepth printmove algOpts ini_tbl max_rounds nmlen imlen cmd_strs
-             min_score =
-  let Cluster.Table ini_nl ini_il _ _ = ini_tbl
-      allowed_next = Cluster.doNextBalance ini_tbl max_rounds min_score
-      m_fin_tbl = if allowed_next
-                    then Cluster.tryBalance algOpts ini_tbl
+iterateDepth printmove algOpts table max_rounds node_name_len
+             inst_name_len cmd_strs min_score =
+  let Cluster.Table nodes instances _ _ = table
+      allowed_next = Cluster.doNextBalance table max_rounds min_score
+      rebalanced = if allowed_next
+                    then Cluster.tryBalance algOpts table
                     else Nothing
-  in case m_fin_tbl of
-       Just fin_tbl ->
+      printSolutionLine = Cluster.printSolutionLine nodes
+                            instances node_name_len
+                            inst_name_len
+  in case rebalanced of
+       Just table' ->
          do
-           let (Cluster.Table _ _ _ fin_plc) = fin_tbl
-           cur_plc@(idx, _, _, move, _) <-
-             exitIfEmpty "Empty placement list returned for solution?!" fin_plc
-           let fin_plc_len = length fin_plc
-               (sol_line, cmds) = Cluster.printSolutionLine ini_nl ini_il
-                                  nmlen imlen cur_plc fin_plc_len
-               afn = Cluster.involvedNodes ini_il cur_plc
-               upd_cmd_strs = (afn, idx, move, cmds):cmd_strs
+           let (Cluster.Table _ _ _ placements) = table'
+           placement@(idx, _, _, move, _) <-
+             exitIfEmpty "Empty placement list returned for solution?!"
+                placements
+           let n_placements = length placements
+               (sol_line, cmds) = printSolutionLine placement n_placements
+               affected_nodes = Cluster.involvedNodes instances placement
+               updated_cmd_strs = (affected_nodes, idx, move, cmds):cmd_strs
            when printmove $ do
                putStrLn sol_line
                hFlush stdout
-           iterateDepth printmove algOpts fin_tbl max_rounds
-                        nmlen imlen upd_cmd_strs min_score
-       Nothing -> return (ini_tbl, cmd_strs)
+           iterateDepth printmove algOpts table' max_rounds
+                        node_name_len inst_name_len updated_cmd_strs min_score
+       Nothing -> return (table, cmd_strs)
 
 -- | Displays the cluster stats.
 printStats :: Node.List -> Node.List -> IO ()
