@@ -403,7 +403,7 @@ class ConfigWriter(object):
     self._UnlockedAddDisk(disk, replace=replace)
     self._UnlockedAttachInstanceDisk(inst_uuid, disk.uuid, idx)
 
-  @_ConfigSync()
+  @ConfigSync()
   def AttachInstanceDisk(self, inst_uuid, disk, idx=None):
     """Attach an existing disk to an instance.
 
@@ -472,7 +472,7 @@ class ConfigWriter(object):
     self._UnlockedDetachInstanceDisk(inst_uuid, disk_uuid)
     self._UnlockedRemoveDisk(disk_uuid)
 
-  @_ConfigSync()
+  @ConfigSync()
   def DetachInstanceDisk(self, inst_uuid, disk_uuid):
     """Detach a disk from an instance.
 
@@ -530,7 +530,7 @@ class ConfigWriter(object):
 
     return disk
 
-  @_ConfigSync(shared=1)
+  @ConfigSync(shared=1)
   def GetDiskInfoByName(self, disk_name):
     """Return information about a named disk.
 
@@ -547,7 +547,7 @@ class ConfigWriter(object):
     """
     return self._ConfigData().disks.keys()
 
-  @_ConfigSync(shared=1)
+  @ConfigSync(shared=1)
   def GetAllDisksInfo(self):
     """Get the configuration of all disks.
 
@@ -2276,7 +2276,7 @@ class ConfigWriter(object):
     """
     self._UnlockedGetDiskInfo(disk_uuid).nodes = nodes
 
-  @_ConfigSync()
+  @ConfigSync()
   def SetDiskLogicalID(self, disk_uuid, logical_id):
     """Sets the logical_id of an existing disk
 
