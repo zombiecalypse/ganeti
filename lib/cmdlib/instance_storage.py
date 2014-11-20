@@ -681,7 +681,7 @@ def GenerateDiskTemplate(
           constants.IDISK_ACCESS in disk):
         params[constants.IDISK_ACCESS] = disk[constants.IDISK_ACCESS]
       disk_index = idx + base_index
-      size = disk[constants.IDISK_SIZE]
+      size = int(disk[constants.IDISK_SIZE])
       feedback_fn("* disk %s, size %s" %
                   (disk_index, utils.FormatUnit(size, "h")))
       disk_dev = objects.Disk(dev_type=dev_type, size=size,
