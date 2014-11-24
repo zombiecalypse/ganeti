@@ -74,6 +74,7 @@ module Ganeti.THH ( declareSADT
                   , buildParam
                   , genException
                   , excErrMsg
+                  , ShowContextType(..)
                   ) where
 
 import Control.Arrow ((&&&), second)
@@ -116,6 +117,11 @@ data OptionalType
   | AndRestArguments      -- ^ Special field capturing all the remaining fields
                           -- as plain JSON values
   deriving (Show, Eq)
+
+data ShowContextType
+  = DefaultShow           -- ^ Serialize with 'showJSON'
+  | LocalShow (Q Exp)     -- ^ Serialize with a function
+                          -- @a -> (JSON.JSValue, [(String, JSON.JSValue)])@
 
 -- | Serialised field data type describing how to generate code for the field.
 -- Each field has a type, which isn't captured in the type of the data type,
@@ -177,9 +183,10 @@ data Field = Field { fieldName        :: String
                      -- ^ an optional custom deserialization function of type
                      -- @[(String, JSON.JSValue)] -> JSON.JSValue ->
                      -- JSON.Result t@
-                   , fieldShow        :: Maybe (Q Exp)
+                   , fieldShow        :: ShowContextType
                      -- ^ an optional custom serialization function of type
-                     -- @t -> (JSON.JSValue, [(String, JSON.JSValue)])@
+                     -- @t -> (JSON.JSValue, [(String, JSON.JSValue)])@ or
+                     -- @c -> t -> (JSON.JSValue, [(String, JSON.JSValue)])
                    , fieldExtraKeys   :: [String]
                      -- ^ a list of extra keys added by 'fieldShow'
                    , fieldDefault     :: Maybe (Q Exp)
@@ -198,7 +205,7 @@ simpleField fname ftype =
   Field { fieldName        = fname
         , fieldType        = ftype
         , fieldRead        = Nothing
-        , fieldShow        = Nothing
+        , fieldShow        = DefaultShow
         , fieldExtraKeys   = []
         , fieldDefault     = Nothing
         , fieldConstr      = Nothing
@@ -213,7 +220,7 @@ andRestArguments fname =
   Field { fieldName        = fname
         , fieldType        = [t| M.Map String JSON.JSValue |]
         , fieldRead        = Nothing
-        , fieldShow        = Nothing
+        , fieldShow        = DefaultShow
         , fieldExtraKeys   = []
         , fieldDefault     = Nothing
         , fieldConstr      = Nothing
@@ -264,7 +271,7 @@ customField :: Name      -- ^ The name of the read function
             -> Field     -- ^ The original field
             -> Field     -- ^ Updated field
 customField readfn showfn extra field =
-  field { fieldRead = Just (varE readfn), fieldShow = Just (varE showfn)
+  field { fieldRead = Just (varE readfn), fieldShow = LocalShow (varE showfn)
         , fieldExtraKeys = extra }
 
 -- | Computes the record name for a given field, based on either the
@@ -1194,8 +1201,9 @@ genSaveObject sname = do
 -- various types of fields that we have.
 saveObjectField :: Name -> Field -> Q Exp
 saveObjectField fvar field = do
-  let formatFn = fromMaybe [| JSON.showJSON &&& (const []) |] $
-                           fieldShow field
+  let formatFn = case fieldShow field of
+                   DefaultShow -> [| JSON.showJSON &&& (const []) |]
+                   ShowLocal q -> $q
       formatFnTyped = sigE formatFn
         [t| $(fieldType field) -> (JSON.JSValue, [(String, JSON.JSValue)]) |]
   let formatCode v = [| let (actual, extra) = $formatFnTyped $(v)

@@ -82,8 +82,8 @@ specialNumericalField f field =
 timeAsDoubleField :: String -> Field
 timeAsDoubleField fname =
   (simpleField fname [t| ClockTime |])
-    { fieldRead = Just $ [| \_ -> liftM unTimeAsDoubleJSON . JSON.readJSON |]
-    , fieldShow = Just $ [| \c -> (JSON.showJSON $ TimeAsDoubleJSON c, []) |]
+    { fieldRead = Just [| \_ -> liftM unTimeAsDoubleJSON . JSON.readJSON |]
+    , fieldShow = LocalShow [| \c -> (JSON.showJSON $ TimeAsDoubleJSON c, []) |]
     }
 
 -- | A helper function for creating fields whose Haskell representation is
@@ -96,7 +96,7 @@ integralField typq fname =
       { fieldRead = Just $
         [| \_ -> liftM $('fromInteger ~:: (conT ''Integer ~-> typq))
                    . JSON.readJSON |]
-      , fieldShow = Just $
+      , fieldShow = LocalShow $
           [| \c -> (JSON.showJSON
                     . $('toInteger ~:: (typq ~-> conT ''Integer))
                     $ c, []) |]
