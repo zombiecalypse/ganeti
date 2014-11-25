@@ -899,6 +899,9 @@ dtExt = Types.diskTemplateToRaw DTExt
 dtGluster :: String
 dtGluster = Types.diskTemplateToRaw DTGluster
 
+dtMixed :: String
+dtMixed = "mixed"
+
 -- | This is used to order determine the default disk template when
 -- the list of enabled disk templates is inferred from the current
 -- state of the cluster.  This only happens on an upgrade from a
@@ -911,7 +914,8 @@ diskTemplatePreference =
    DTPlain, DTRbd, DTSharedFile, DTGluster]
 
 diskTemplates :: FrozenSet String
-diskTemplates = ConstantUtils.mkSet $ map Types.diskTemplateToRaw [minBound..]
+diskTemplates = ConstantUtils.mkSet $
+                  map Types.diskTemplateToRaw [minBound..] ++ [dtMixed]
 
 -- | Disk templates that are enabled by default
 defaultEnabledDiskTemplates :: [String]
