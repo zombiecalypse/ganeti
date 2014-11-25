@@ -1,4 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-unused-binds
+   -fno-warn-unused-matches #-}
 
 {-| Implementation of the Ganeti LUXI interface.
 

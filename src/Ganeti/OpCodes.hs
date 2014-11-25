@@ -1,5 +1,6 @@
 {-# LANGUAGE ExistentialQuantification, TemplateHaskell, StandaloneDeriving #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-unused-binds
+   -fno-warn-unused-matches #-}
 
 {-| Implementation of the opcodes.
 

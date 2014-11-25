@@ -122,6 +122,9 @@ data ShowContextType
   = DefaultShow           -- ^ Serialize with 'showJSON'
   | LocalShow (Q Exp)     -- ^ Serialize with a function
                           -- @a -> (JSON.JSValue, [(String, JSON.JSValue)])@
+  | GlobalShow (Q Exp)    -- ^ Serialize with a function @c -> a ->
+                          -- (JSON.JSValue, [(String, JSON.JSValue)])@
+                          -- where c is the object this is a field of.
 
 -- | Serialised field data type describing how to generate code for the field.
 -- Each field has a type, which isn't captured in the type of the data type,
@@ -782,7 +785,6 @@ genOpCodeDecl name cons = do
             cons
   return [DataD [] tname [] decl_d [''Show, ''Eq]]
 
--- | Generates the OpCode data type.
 -- | Generates the instances for the OpCode data type.
 --
 -- This takes an opcode logical definition, and builds the JSON serialisation
@@ -796,8 +798,8 @@ genOpCode name cons = do
   let (allfsig, allffn) = genAllOpFields "allOpFields" cons
   -- DictObject
   let luxiCons = map opcodeConsToLuxiCons cons
-  dictObjInst <- genOpCodeDictObject tname saveConstructor loadOpConstructor
-                                     luxiCons
+  dictObjInst <- genOpCodeDictObject tname (saveConstructor tname)
+                                     loadOpConstructor luxiCons
   -- rest
   pyDecls <- pyClasses cons
   return $ [allfsig, allffn] ++ dictObjInst ++ pyDecls
@@ -827,13 +829,15 @@ genAllOpFields sname opdefs =
 -- This matches the opcode with variables named the same as the
 -- constructor fields (just so that the spliced in code looks nicer),
 -- and passes those name plus the parameter definition to 'saveObjectField'.
-saveConstructor :: LuxiConstructor -- ^ The constructor
+saveConstructor :: Name -> LuxiConstructor -- ^ The constructor
                 -> Q Clause        -- ^ Resulting clause
-saveConstructor (sname, fields) = do
+saveConstructor pname (sname, fields) = do
   let cname = mkName sname
+  (DataConI _ ptype _ _) <- reify cname
   fnames <- mapM (newName . fieldVariable) fields
-  let pat = conP cname (map varP fnames)
-  let felems = zipWith saveObjectField fnames fields
+  let pvar = mkName "p"
+      pat = asP pvar $ conP cname (map varP fnames)
+  let felems = zipWith (saveObjectField pname pvar) fnames fields
       -- now build the OP_ID serialisation
       opid = [| [( $(stringE "OP_ID"),
                    JSON.showJSON $(stringE . deCamelCase $ sname) )] |]
@@ -921,7 +925,7 @@ genLuxiOp name cons = do
             cons
   let declD = DataD [] (mkName name) [] decl_d [''Show, ''Eq]
   -- generate DictObject instance
-  dictObjInst <- genOpCodeDictObject tname saveLuxiConstructor
+  dictObjInst <- genOpCodeDictObject tname (saveLuxiConstructor tname)
                                      loadOpConstructor cons
   -- .. and use it to construct 'opToArgs' of 'toDict'
   -- (as we know that the output of 'toDict' is always in the proper order)
@@ -938,12 +942,13 @@ genLuxiOp name cons = do
   return $ [declD] ++ dictObjInst ++ opToArgsDecs ++ req_defs
 
 -- | Generates the \"save\" clause for entire LuxiOp constructor.
-saveLuxiConstructor :: LuxiConstructor -> Q Clause
-saveLuxiConstructor (sname, fields) = do
+saveLuxiConstructor :: Name -> LuxiConstructor -> Q Clause
+saveLuxiConstructor pname (sname, fields) = do
   let cname = mkName sname
   fnames <- mapM (newName . fieldVariable) fields
-  let pat = conP cname (map varP fnames)
-  let felems = zipWith saveObjectField fnames fields
+  let pvar = mkName "p"
+      pat = asP pvar $ conP cname (map varP fnames)
+  let felems = zipWith (saveObjectField pname pvar) fnames fields
       flist = [| concat $(listE felems) |]
   clause [pat] (normalB flist) []
 
@@ -1116,7 +1121,8 @@ buildObjectWithForthcoming sname field_pfx fields = do
 buildObjectSerialisation :: String -> [Field] -> Q [Dec]
 buildObjectSerialisation sname fields = do
   let name = mkName sname
-  dictdecls <- genDictObject saveObjectField
+      pvar = mkName "p"
+  dictdecls <- genDictObject (saveObjectField name pvar)
                              (loadObjectField fields) sname fields
   savedecls <- genSaveObject sname
   (loadsig, loadfn) <- genLoadObject sname
@@ -1172,10 +1178,11 @@ genDictObject :: (Name -> Field -> Q Exp)  -- ^ a saving function
               -> Q [Dec]
 genDictObject save_fn load_fn sname fields = do
   let name = mkName sname
+      pname = mkName "p"
   -- toDict
   fnames <- mapM (newName . fieldVariable) fields
-  let pat = conP name (map varP fnames)
-      tdexp = [| concat $(listE $ zipWith save_fn fnames fields) |]
+  let pat = asP pname $ conP name (map varP fnames)
+      tdexp = [| concat $ $(listE $ zipWith save_fn fnames fields) |]
   tdclause <- clause [pat] (normalB tdexp) []
   -- fromDict
   fdexp <- loadConstructor name load_fn fields
@@ -1199,26 +1206,28 @@ genSaveObject sname = do
 
 -- | Generates the code for saving an object's field, handling the
 -- various types of fields that we have.
-saveObjectField :: Name -> Field -> Q Exp
-saveObjectField fvar field = do
+saveObjectField :: Name -> Name -> Name -> Field -> Q Exp
+saveObjectField pname pvar fvar field = do
   let formatFn = case fieldShow field of
-                   DefaultShow -> [| JSON.showJSON &&& (const []) |]
-                   ShowLocal q -> $q
+                   DefaultShow -> [| const $ JSON.showJSON &&& (const []) |]
+                   LocalShow q -> [| const $q |]
+                   GlobalShow q -> q
       formatFnTyped = sigE formatFn
-        [t| $(fieldType field) -> (JSON.JSValue, [(String, JSON.JSValue)]) |]
-  let formatCode v = [| let (actual, extra) = $formatFnTyped $(v)
-                         in ($nameE, actual) : extra |]
+        [t| $(conT pname) -> $(fieldType field)
+                          -> (JSON.JSValue, [(String, JSON.JSValue)]) |]
+  let formatCode p v = [| let (actual, extra) = $formatFnTyped $p $v
+                          in ($nameE, actual) : extra |]
   case fieldIsOptional field of
     OptionalOmitNull ->       [| case $(fvarE) of
                                    Nothing -> []
-                                   Just v  -> $(formatCode [| v |])
+                                   Just v  -> $(formatCode (varE pvar) [| v |])
                               |]
     OptionalSerializeNull ->  [| case $(fvarE) of
                                    Nothing -> [( $nameE, JSON.JSNull )]
-                                   Just v  -> $(formatCode [| v |])
+                                   Just v  -> $(formatCode (varE pvar) [| v |])
                               |]
-    NotOptional ->            formatCode fvarE
-    AndRestArguments -> [| M.toList $(varE fvar) |]
+    NotOptional ->            formatCode (varE pvar) fvarE
+    AndRestArguments -> [| M.toList $fvarE |]
   where nameE = stringE (fieldName field)
         fvarE = varE fvar
 
@@ -1347,7 +1356,7 @@ buildParamAllFields sname fields =
 buildPParamSerialisation :: String -> [Field] -> Q [Dec]
 buildPParamSerialisation sname fields = do
   let name = mkName sname
-  dictdecls <- genDictObject savePParamField loadPParamField sname fields
+  dictdecls <- genDictObject (savePParamField name) loadPParamField sname fields
   savedecls <- genSaveObject sname
   (loadsig, loadfn) <- genLoadObject sname
   shjson <- objectShowJSON sname
@@ -1357,11 +1366,12 @@ buildPParamSerialisation sname fields = do
   return $ dictdecls ++ savedecls ++ [loadsig, loadfn, instdecl]
 
 -- | Generates code to save an optional parameter field.
-savePParamField :: Name -> Field -> Q Exp
-savePParamField fvar field = do
+savePParamField :: Name -> Name -> Field -> Q Exp
+savePParamField pname fvar field = do
   checkNonOptDef field
   let actualVal = mkName "v"
-  normalexpr <- saveObjectField actualVal field
+      parentVal = mkName "p"
+  normalexpr <- saveObjectField pname parentVal actualVal field
   -- we have to construct the block here manually, because we can't
   -- splice-in-splice
   return $ CaseE (VarE fvar) [ Match (ConP 'Nothing [])

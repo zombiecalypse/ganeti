@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell, FunctionalDependencies #-}
 {-# OPTIONS -fno-warn-unused-binds #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds
+   -fno-warn-unused-matches #-}
 
 {-| Unittests for our template-haskell generated code.
 
