@@ -57,6 +57,7 @@ module Ganeti.THH ( declareSADT
                   , genStrOfOp
                   , genStrOfKey
                   , genLuxiOp
+                  , globalShow
                   , Field (..)
                   , simpleField
                   , andRestArguments
@@ -266,6 +267,9 @@ makeOptional field = if  and [ fieldIsOptional field == NotOptional
                              ]
                         then optionalField field
                         else field
+
+globalShow :: Q Exp -> Field -> Field
+globalShow expr field = field { fieldShow = GlobalShow expr }
 
 -- | Sets custom functions on a field.
 customField :: Name      -- ^ The name of the read function

@@ -44,7 +44,7 @@ module Ganeti.Objects
   , PartialNic(..)
   , FileDriver(..)
   , DataCollectorConfig(..)
-  , DiskTemplate(..)
+  , DiskTemplate(..)  -- re-export from Types
   , PartialBeParams(..)
   , FilledBeParams(..)
   , PartialNDParams(..)
@@ -108,7 +108,7 @@ module Ganeti.Objects
 import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad.State
-import Data.List (foldl', intercalate)
+import Data.List (foldl', intercalate, nub)
 import Data.Maybe
 import qualified Data.Map as Map
 import Data.Monoid
@@ -116,6 +116,7 @@ import Data.Ord (comparing)
 import Data.Ratio (numerator, denominator)
 import Data.Tuple (swap)
 import Data.Word
+import Language.Haskell.TH
 import Text.JSON (showJSON, readJSON, JSON, JSValue(..), fromJSString,
                   toJSString)
 import qualified Text.JSON as J
@@ -689,19 +690,53 @@ instance TagsObject Cluster where
 
 -- * ConfigData definitions
 
-$(buildObject "ConfigData" "config" $
---  timeStampFields ++
-  [ simpleField "version"    [t| Int                 |]
-  , simpleField "cluster"    [t| Cluster             |]
-  , simpleField "nodes"      [t| Container Node      |]
-  , simpleField "nodegroups" [t| Container NodeGroup |]
-  , simpleField "instances"  [t| Container Instance  |]
-  , simpleField "networks"   [t| Container Network   |]
-  , simpleField "disks"      [t| Container Disk      |]
-  , simpleField "filters"    [t| Container FilterRule |]
-  ]
-  ++ timeStampFields
-  ++ serialFields)
+-- | Add an artificial attribute to the instance: the disk_template
+--
+-- This is for pre-2.14 compatibility. The disk template is 
+-- 1. The unique disk type of all disks attached to it if that exists.
+-- 2. dtDiskless if no disks are attached.
+-- 3. dtMixed if multiple disk types are attached
+addDiskTemplate :: Container Disk -> Instance -> JSValue
+addDiskTemplate all_disks inst =
+  let disk_types = (\x -> lidDiskType <$> diskLogicalId x) <$> all_disks
+      lookup_disks = join . flip (lookupContainer Nothing) disk_types
+      dts_of_inst = nub . catMaybes . fmap lookup_disks $ instDisks inst
+      dt = case dts_of_inst of
+             [] -> showJSON C.dtDiskless
+             [fdt] -> showJSON fdt
+             _  -> showJSON C.dtMixed
+      inst_dict = toDict inst
+  in J.makeObj $ ("disk_template", dt):inst_dict
+
+showInstances :: (Functor f, JSON (f JSValue)) => f Instance
+                                     -> Container Disk
+                                     -> (JSValue, [(String, JSValue)])
+showInstances insts disks = (showJSON $ fmap (addDiskTemplate disks) insts
+                            , [])
+
+$(do
+  config <- newName "config"
+  instances <- newName "insts"
+  let confE = VarE config
+      showInst = VarE (mkName "showInstances")
+      configDisks = VarE (mkName "configDisks")
+      -- \config instances -> showInstances instances (configDisks config)
+      encode = return . LamE [VarP config] . LamE [VarP instances] $
+                 showInst `AppE` VarE instances
+                          `AppE` (configDisks `AppE` confE)
+  buildObject "ConfigData" "config" $
+    [ simpleField "version"    [t| Int                 |]
+    , simpleField "cluster"    [t| Cluster             |]
+    , simpleField "nodes"      [t| Container Node      |]
+    , simpleField "nodegroups" [t| Container NodeGroup |]
+    , globalShow encode $
+        simpleField "instances"  [t| Container Instance  |]
+    , simpleField "networks"   [t| Container Network   |]
+    , simpleField "disks"      [t| Container Disk      |]
+    , simpleField "filters"    [t| Container FilterRule |]
+    ]
+    ++ timeStampFields
+    ++ serialFields)
 
 instance SerialNoObject ConfigData where
   serialOf = configSerial
