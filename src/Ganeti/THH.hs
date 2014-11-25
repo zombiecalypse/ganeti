@@ -833,7 +833,6 @@ saveConstructor :: Name -> LuxiConstructor -- ^ The constructor
                 -> Q Clause        -- ^ Resulting clause
 saveConstructor pname (sname, fields) = do
   let cname = mkName sname
-  (DataConI _ ptype _ _) <- reify cname
   fnames <- mapM (newName . fieldVariable) fields
   let pvar = mkName "p"
       pat = asP pvar $ conP cname (map varP fnames)
