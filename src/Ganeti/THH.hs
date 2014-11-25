@@ -53,6 +53,7 @@ module Ganeti.THH ( declareSADT
                   , OpCodeField(..)
                   , OpCodeDescriptor(..)
                   , genOpCode
+                  , genOpCodeDecl
                   , genStrOfOp
                   , genStrOfKey
                   , genLuxiOp
@@ -760,21 +761,31 @@ genOpCodeDictObject tname savefn loadfn cons = do
 
 -- | Generates the OpCode data type.
 --
--- This takes an opcode logical definition, and builds both the
--- datatype and the JSON serialisation out of it. We can't use a
--- generic serialisation since we need to be compatible with Ganeti's
--- own, so we have a few quirks to work around.
-genOpCode :: String              -- ^ Type name to use
-          -> [OpCodeConstructor] -- ^ Constructor name and parameters
-          -> Q [Dec]
-genOpCode name cons = do
+-- This takes an opcode logical definition, and builds the data type
+-- out of it.
+genOpCodeDecl :: String              -- ^ Type name to use
+              -> [OpCodeConstructor] -- ^ Constructor name and parameters
+              -> Q [Dec]
+genOpCodeDecl name cons = do
   let tname = mkName name
   decl_d <- mapM (\(cname, _, _, fields, _) -> do
                     -- we only need the type of the field, without Q
                     fields' <- mapM (fieldTypeInfo "op") fields
                     return $ RecC (mkName cname) fields')
             cons
-  let declD = DataD [] tname [] decl_d [''Show, ''Eq]
+  return [DataD [] tname [] decl_d [''Show, ''Eq]]
+
+-- | Generates the OpCode data type.
+-- | Generates the instances for the OpCode data type.
+--
+-- This takes an opcode logical definition, and builds the JSON serialisation
+-- out of it. We can't use a generic serialisation since we need to be
+-- compatible with Ganeti's own, so we have a few quirks to work around.
+genOpCode :: String              -- ^ Type name to use
+          -> [OpCodeConstructor] -- ^ Constructor name and parameters
+          -> Q [Dec]
+genOpCode name cons = do
+  let tname = mkName name
   let (allfsig, allffn) = genAllOpFields "allOpFields" cons
   -- DictObject
   let luxiCons = map opcodeConsToLuxiCons cons
@@ -782,7 +793,7 @@ genOpCode name cons = do
                                      luxiCons
   -- rest
   pyDecls <- pyClasses cons
-  return $ [declD, allfsig, allffn] ++ dictObjInst ++ pyDecls
+  return $ [allfsig, allffn] ++ dictObjInst ++ pyDecls
 
 -- | Generates the function pattern returning the list of fields for a
 -- given constructor.

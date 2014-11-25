@@ -116,10 +116,8 @@ instance PyValue JSValue where
   showValue (JSObject obj) = showValue obj
   showValue x = show x
 
--- | OpCode representation.
---
--- We only implement a subset of Ganeti opcodes: those which are actually used
--- in the htools codebase.
+-- * Generate all opcodes used in the haskell code base.
+$(genOpCodeDecl "OpCode" opCodeDescriptions)
 $(genOpCode "OpCode" opCodeDescriptions)
 
 deriving instance Ord OpCode
