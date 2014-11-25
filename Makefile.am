@@ -946,6 +946,7 @@ HS_LIB_SRCS = \
 	src/Ganeti/Objects/Nic.hs \
 	src/Ganeti/OpCodes.hs \
 	src/Ganeti/OpCodes/Lens.hs \
+	src/Ganeti/OpCodes/Description.hs \
 	src/Ganeti/OpParams.hs \
 	src/Ganeti/Path.hs \
 	src/Ganeti/Parsers.hs \
