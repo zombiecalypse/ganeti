@@ -269,12 +269,12 @@ makeOptional field = if  and [ fieldIsOptional field == NotOptional
 
 -- | Sets custom functions on a field.
 customField :: Name      -- ^ The name of the read function
-            -> Name      -- ^ The name of the show function
+            -> Q Exp     -- ^ The function generating the value
             -> [String]  -- ^ The name of extra field keys
             -> Field     -- ^ The original field
             -> Field     -- ^ Updated field
 customField readfn showfn extra field =
-  field { fieldRead = Just (varE readfn), fieldShow = LocalShow (varE showfn)
+  field { fieldRead = Just (varE readfn), fieldShow = GlobalShow showfn
         , fieldExtraKeys = extra }
 
 -- | Computes the record name for a given field, based on either the

@@ -167,8 +167,8 @@ encodeDLId (LIDExt extprovider name) =
 
 -- | Custom encoder for DiskLogicalId, composing both the logical id
 -- and the extra disk_type field.
-encodeFullDLId :: DiskLogicalId -> (JSValue, [(String, JSValue)])
-encodeFullDLId v = (encodeDLId v, lidEncodeType v)
+encodeFullDLId :: a -> DiskLogicalId -> (JSValue, [(String, JSValue)])
+encodeFullDLId _ v = (encodeDLId v, lidEncodeType v)
 
 -- | Custom decoder for DiskLogicalId. This is manual for now, since
 -- we don't have yet automation for separate-key style fields.
@@ -239,22 +239,29 @@ decodeDLId obj lid = do
 
 -- | Disk data structure.
 
-$(buildObjectWithForthcoming "Disk" "disk" $
-  [ customField 'decodeDLId 'encodeFullDLId ["dev_type"] $
-      simpleField "logical_id"    [t| DiskLogicalId   |]
-  , defaultField  [| [] |]
-      $ simpleField "children" (return . AppT ListT . ConT $ mkName "Disk")
-  , defaultField  [| [] |] $ simpleField "nodes" [t| [String] |]
-  , defaultField [| "" |] $ simpleField "iv_name" [t| String |]
-  , simpleField "size" [t| Int |]
-  , defaultField [| DiskRdWr |] $ simpleField "mode" [t| DiskMode |]
-  , optionalField $ simpleField "name" [t| String |]
-  , optionalField $ simpleField "spindles" [t| Int |]
-  , optionalField $ simpleField "params" [t| DiskParams |]
-  ]
-  ++ uuidFields
-  ++ serialFields
-  ++ timeStampFields)
+$(do
+  p <- newName "disk"
+  logicalIdName <- newName "l"
+  -- \disk l -> encodeFullDLId disk l
+  -- Explicit, because it uses names that don't exist yet.
+  let encoding = return . LamE [VarP p] . LamE [VarP logicalIdName] $
+                   VarE 'encodeFullDLId `AppE` VarE p `AppE` VarE logicalIdName
+  buildObjectWithForthcoming "Disk" "disk" $
+    [ customField 'decodeDLId encoding ["dev_type"] $
+        simpleField "logical_id"    [t| DiskLogicalId   |]
+    , defaultField  [| [] |]
+        $ simpleField "children" (return . AppT ListT . ConT $ mkName "Disk")
+    , defaultField  [| [] |] $ simpleField "nodes" [t| [String] |]
+    , defaultField [| "" |] $ simpleField "iv_name" [t| String |]
+    , simpleField "size" [t| Int |]
+    , defaultField [| DiskRdWr |] $ simpleField "mode" [t| DiskMode |]
+    , optionalField $ simpleField "name" [t| String |]
+    , optionalField $ simpleField "spindles" [t| Int |]
+    , optionalField $ simpleField "params" [t| DiskParams |]
+    ]
+    ++ uuidFields
+    ++ serialFields
+    ++ timeStampFields)
 
 instance UuidObject Disk where
   uuidOf = diskUuid
