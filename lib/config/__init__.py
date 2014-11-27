@@ -286,23 +286,6 @@ class ConfigWriter(object):
     nodegroup = self._UnlockedGetNodeGroup(node.group)
     return self._UnlockedGetGroupDiskParams(nodegroup)
 
-  @ConfigSync()
-  def SetInstanceDiskTemplate(self, inst_uuid, disk_template):
-    """Set the instance's disk template to the given value.
-
-    @type inst_uuid: string
-    @param inst_uuid: The UUID of the instance object
-    @type disk_template: string
-    @param disk_template: The new disk template of the instance
-
-    """
-    instance = self._UnlockedGetInstanceInfo(inst_uuid)
-    if instance is None:
-      raise errors.ConfigurationError("Unknown instance '%s'" % inst_uuid)
-
-    # Update the disk template of the instance
-    instance.disk_template = disk_template
-
   def _UnlockedGetInstanceDisks(self, inst_uuid):
     """Return the disks' info for the given instance
 
@@ -992,11 +975,6 @@ class ConfigWriter(object):
           _helper(owner, "nicparams",
                   filled, constants.NICS_PARAMETER_TYPES)
           _helper_nic(owner, filled)
-
-      # disk template checks
-      if not instance.disk_template in data.cluster.enabled_disk_templates:
-        result.append("instance '%s' uses the disabled disk template '%s'." %
-                      (instance.name, instance.disk_template))
 
       # parameter checks
       if instance.beparams:
