@@ -320,6 +320,7 @@ $(THH.declareLADT ''String "DiskTemplate"
        , ("DTRbd",        "rbd")
        , ("DTExt",        "ext")
        , ("DTGluster",    "gluster")
+       , ("DTMixed",      "mixed")
        ])
 $(THH.makeJSONInstance ''DiskTemplate)
 
@@ -492,6 +493,7 @@ $(THH.declareLADT ''String "StorageType"
   , ("StorageBlock", "blockdev")
   , ("StorageRados", "rados")
   , ("StorageExt", "ext")
+  , ("StorageMixed", "mixed")
   ])
 $(THH.makeJSONInstance ''StorageType)
 
@@ -513,6 +515,7 @@ data StorageUnit = SUFile StorageKey
                  | SULvmPv StorageKey SPExclusiveStorage
                  | SULvmVg StorageKey SPExclusiveStorage
                  | SUDiskless StorageKey
+                 | SUMixed StorageKey
                  | SUBlock StorageKey
                  | SURados StorageKey
                  | SUExt StorageKey
@@ -528,6 +531,7 @@ instance Show StorageUnit where
   show (SUBlock key) = showSUSimple StorageBlock key
   show (SURados key) = showSUSimple StorageRados key
   show (SUExt key) = showSUSimple StorageExt key
+  show (SUMixed key) = showSUSimple StorageMixed key
 
 instance JSON StorageUnit where
   showJSON (SUFile key) = showJSON (StorageFile, key, []::[String])
@@ -539,6 +543,7 @@ instance JSON StorageUnit where
   showJSON (SUBlock key) = showJSON (StorageBlock, key, []::[String])
   showJSON (SURados key) = showJSON (StorageRados, key, []::[String])
   showJSON (SUExt key) = showJSON (StorageExt, key, []::[String])
+  showJSON (SUMixed key) = showJSON (StorageMixed, key, []::[String])
 -- FIXME: add readJSON implementation
   readJSON = fail "Not implemented"
 
@@ -562,6 +567,7 @@ diskTemplateToStorageType DTRbd = StorageRados
 diskTemplateToStorageType DTDiskless = StorageDiskless
 diskTemplateToStorageType DTBlock = StorageBlock
 diskTemplateToStorageType DTGluster = StorageGluster
+diskTemplateToStorageType DTMixed = StorageMixed
 
 -- | Equips a raw storage unit with its parameters
 addParamsToStorageUnit :: SPExclusiveStorage -> StorageUnitRaw -> StorageUnit
@@ -574,6 +580,7 @@ addParamsToStorageUnit _ (SURaw StorageGluster key) = SUGluster key
 addParamsToStorageUnit es (SURaw StorageLvmPv key) = SULvmPv key es
 addParamsToStorageUnit es (SURaw StorageLvmVg key) = SULvmVg key es
 addParamsToStorageUnit _ (SURaw StorageRados key) = SURados key
+addParamsToStorageUnit _ (SURaw StorageMixed key) = SUMixed key
 
 -- | Node evac modes.
 --
