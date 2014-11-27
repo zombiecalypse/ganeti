@@ -309,9 +309,6 @@ def RemoveDisks(lu, instance, disk_template=None, disks=None,
   if disks is None:
     disks = lu.cfg.GetInstanceDisks(instance.uuid)
 
-  if disk_template is None:
-    disk_template = instance.disk_template
-
   anno_disks = AnnotateDiskParams(instance, disks, lu.cfg)
   for (idx, device) in enumerate(anno_disks):
     if target_node_uuid:
