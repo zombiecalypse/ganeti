@@ -227,9 +227,10 @@ computeBadItems :: Node.List -> Instance.List ->
                    ([Node.Node], [Instance.Instance])
 computeBadItems nl il =
   let bad_nodes = verifyN1 $ getOnline nl
+      allInstances n = Node.sList n ++ Node.pList n
       bad_instances = map (`Container.find` il) .
                       sort . nub $
-                      concatMap (\ n -> Node.sList n ++ Node.pList n) bad_nodes
+                      concatMap allInstances bad_nodes
   in
     (bad_nodes, bad_instances)
 
@@ -759,8 +760,9 @@ tryBalance opts ini_tbl =
 -- | Build failure stats out of a list of failures.
 collapseFailures :: [FailMode] -> FailStats
 collapseFailures flst =
-    map (\k -> (k, foldl' (\a e -> if e == k then a + 1 else a) 0 flst))
-            [minBound..maxBound]
+  let count k = foldl' (\a e -> if e == k then a + 1 else a) 0 flst
+      -- ^ This isn't the prettiest way to count, but the fastest one
+  in map (\k -> (k, count k)) [minBound..maxBound]
 
 -- | Compares two Maybe AllocElement and chooses the best score.
 bestAllocElement :: Maybe Node.AllocElement
@@ -965,7 +967,8 @@ findBestAllocGroup :: Group.List           -- ^ The group list
                    -> Result (Group.Group, AllocSolution, [String])
 findBestAllocGroup mggl mgnl mgil allowed_gdxs inst cnt =
   let groups_by_idx = splitCluster mgnl mgil
-      groups = map (\(gid, d) -> (Container.find gid mggl, d)) groups_by_idx
+      lookupGid gid d = (Container.find gid mggl, d)
+      groups = map (uncurry lookupGid) groups_by_idx
       groups' = maybe groups
                 (\gs -> filter ((`elem` gs) . Group.idx . fst) groups)
                 allowed_gdxs
