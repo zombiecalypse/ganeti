@@ -744,13 +744,13 @@ doNextBalance ini_tbl max_rounds min_score =
 tryBalance :: AlgorithmOptions  -- ^ Algorithmic options for balancing
               -> Table          -- ^ The starting table
               -> Maybe Table    -- ^ The resulting table and commands
-tryBalance opts ini_tbl =
+tryBalance opts init_table =
     let evac_mode = algEvacMode opts
-        mg_limit = algMinGainLimit opts
+        min_gain_limit = algMinGainLimit opts
         min_gain = algMinGain opts
-        Table ini_nl ini_il ini_cv _ = ini_tbl
-        all_inst = Container.elems ini_il
-        all_nodes = Container.elems ini_nl
+        Table init_nodelist init_instancelist init_score _ = init_table
+        all_inst = Container.elems init_instancelist
+        all_nodes = Container.elems init_nodelist
         (offline_nodes, online_nodes) = partition Node.offline all_nodes
         all_inst' = if evac_mode
                       then let bad_nodes = map Node.idx offline_nodes
@@ -760,10 +760,11 @@ tryBalance opts ini_tbl =
         reloc_inst = filter (\i -> Instance.movable i &&
                                    Instance.autoBalance i) all_inst'
         node_idx = map Node.idx online_nodes
-        fin_tbl = checkMove opts node_idx ini_tbl reloc_inst
+        fin_tbl = checkMove opts node_idx init_table reloc_inst
         (Table _ _ fin_cv _) = fin_tbl
     in
-      if fin_cv < ini_cv && (ini_cv > mg_limit || ini_cv - fin_cv >= min_gain)
+      if fin_cv < init_score && (  init_score > min_gain_limit
+                                || init_score - fin_cv >= min_gain)
       then Just fin_tbl -- this round made success, return the new table
       else Nothing
 
