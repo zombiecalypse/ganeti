@@ -119,6 +119,7 @@
 /test/hs/hpc-htools
 /test/hs/hpc-mon-collector
 /test/hs/htest
+/test/hs/hbenchmarks
 
 # tools
 /tools/kvm-ifup

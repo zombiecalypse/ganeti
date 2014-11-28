@@ -162,6 +162,8 @@ HS_DIRS = \
 	src/Ganeti/Utils \
 	src/Ganeti/WConfd \
 	test/hs \
+	test/hs/Benchmarks \
+	test/hs/Benchmarks/Ganeti \
 	test/hs/Test \
 	test/hs/Test/Ganeti \
 	test/hs/Test/Ganeti/Storage \
@@ -761,8 +763,10 @@ HS_DEFAULT_PROGS = \
 
 if HTEST
 HS_DEFAULT_PROGS += test/hs/htest
+HS_DEFAULT_PROGS += test/hs/hbenchmarks
 else
 EXTRA_DIST += test/hs/htest.hs
+EXTRA_DIST += test/hs/hbenchmarks.hs
 endif
 
 HS_ALL_PROGS = $(HS_DEFAULT_PROGS) $(HS_MYEXECLIB_PROGS)
@@ -1090,6 +1094,9 @@ HS_TEST_SRCS = \
 	test/hs/Test/Ganeti/Utils/MultiMap.hs \
 	test/hs/Test/Ganeti/Utils/Statistics.hs \
 	test/hs/Test/Ganeti/WConfd/TempRes.hs
+
+HS_BENCHMARK_SRCS = \
+	test/hs/Benchmarks/Ganeti/Counting.hs
 
 
 HS_LIBTEST_SRCS = $(HS_LIB_SRCS) $(HS_TEST_SRCS)
@@ -1935,6 +1942,8 @@ python_test_support = \
 
 haskell_tests = test/hs/htest
 
+haskell_benchmarks = test/hs/hbenchmarks
+
 dist_TESTS = \
 	test/py/check-cert-expired_unittest.bash \
 	test/py/daemon-util_unittest.bash \
@@ -1953,6 +1962,7 @@ check_SCRIPTS =
 
 if WANT_HSTESTS
 nodist_TESTS += $(haskell_tests)
+nodist_TESTS += $(haskell_benchmarks)
 # test dependency
 test/hs/offline-test.sh: test/hs/hpc-htools test/hs/hpc-mon-collector
 dist_TESTS += test/hs/offline-test.sh
@@ -2936,7 +2946,7 @@ ganeti.cabal: cabal/ganeti.template.cabal Makefile cabal/cabal-from-modules.py $
 # Target that builds all binaries (including those that are not
 # rebuilt except when running the tests)
 .PHONY: really-all
-really-all: all $(check_SCRIPTS) $(haskell_tests) $(HS_ALL_PROGS)
+really-all: all $(check_SCRIPTS) $(haskell_tests) $(haskell_benchmarks) $(HS_ALL_PROGS)
 
 # we don't need the ancient implicit rules:
 %: %,v
