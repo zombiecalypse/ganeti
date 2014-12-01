@@ -765,7 +765,7 @@ collapseFailures flst =
       -- ^ This isn't the prettiest way to count, but the fastest one
   in map (\k -> (k, count k)) [minBound..maxBound]
 
--- | Compares two Maybe AllocElement and chooses the best score.
+-- | Compares two Maybe AllocElement and chooses the smallest score.
 bestAllocElement :: Maybe Node.AllocElement
                  -> Maybe Node.AllocElement
                  -> Maybe Node.AllocElement
