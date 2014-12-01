@@ -42,6 +42,7 @@ module Ganeti.HTools.Backend.IAlloc
 import Data.Either ()
 import Data.Maybe (fromMaybe, isJust, fromJust)
 import Data.List
+import Control.Applicative ((<$>), (<*>))
 import Control.Monad
 import System.Time
 import Text.JSON (JSObject, JSValue(JSArray),
@@ -70,19 +71,20 @@ type IAllocResult = (String, JSValue, Node.List, Instance.List)
 
 -- | Parse a NIC within an instance (in a creation request)
 parseNic :: String -> JSRecord -> Result Nic.Nic
-parseNic n a = do
-  mac     <- maybeFromObj a "mac"
-  ip      <- maybeFromObj a "ip"
-  mode    <- maybeFromObj a "mode" >>= \m -> case m of
-               Just "bridged" -> Ok $ Just Nic.Bridged
-               Just "routed" -> Ok $ Just Nic.Routed
-               Just "openvswitch" -> Ok $ Just Nic.OpenVSwitch
-               Nothing -> Ok Nothing
-               _ -> Bad $ "invalid NIC mode in instance " ++ n
-  link    <- maybeFromObj a "link"
-  bridge  <- maybeFromObj a "bridge"
-  network <- maybeFromObj a "network"
-  return (Nic.create mac ip mode link bridge network)
+parseNic n a =
+    Nic.create
+      <$> get "mac"
+      <*> get "ip"
+      <*> (get "mode" >>= \m -> case m of
+                 Just "bridged" -> Ok $ Just Nic.Bridged
+                 Just "routed" -> Ok $ Just Nic.Routed
+                 Just "openvswitch" -> Ok $ Just Nic.OpenVSwitch
+                 Nothing -> Ok Nothing
+                 _ -> Bad $ "invalid NIC mode in instance " ++ n)
+      <*> get "link"
+      <*> get "bridge"
+      <*> get "network"
+  where get s = maybeFromObj a s
 
 -- | Parse the basic specifications of an instance.
 --
