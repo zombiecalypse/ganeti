@@ -3,6 +3,12 @@
 This module holds all pure cluster-logic; I\/O related functionality
 goes into the /Main/ module for the individual binaries.
 
+The purpose is to minimize the Score of a cluster, which is a measure of the
+imbalance of the nodes (see 'compDetailedCV' and 'compClusterStatistics'). The
+optimization searches the space of possible moves and requires each move to
+improve the score. Since the function optimized is convex, we use
+hill-climbing (downhill). This doesn't necessarily give the optimal solution,
+but it is reasonably good.
 -}
 
 {-
