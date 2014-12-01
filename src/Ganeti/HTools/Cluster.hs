@@ -222,7 +222,7 @@ type EvacInnerState =
 
 -- * Utility functions
 
--- | Verifies the N+1 status and return the affected nodes.
+-- | Returns the nodes that don't have N+1 redundancy.
 verifyN1 :: [Node.Node] -> [Node.Node]
 verifyN1 = filter Node.failN1
 
