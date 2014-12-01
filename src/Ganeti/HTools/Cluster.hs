@@ -166,8 +166,12 @@ emptyEvacSolution = EvacSolution { esMoved = []
                                  }
 
 -- | The complete state for the balancing solution.
-data Table = Table Node.List Instance.List Score [Placement]
-             deriving (Show)
+data Table = Table {
+  tableNodeList :: Node.List,
+  tableInstanceList :: Instance.List,
+  tableScore :: Score,
+  tablePlacement :: [Placement]
+  } deriving (Show)
 
 -- | Cluster statistics data type.
 data CStats = CStats
@@ -469,9 +473,9 @@ getOnline = filter (not . Node.offline) . Container.elems
 -- * Balancing functions
 
 -- | Compute best table. Note that the ordering of the arguments is important.
-compareTables :: Table -> Table -> Table
-compareTables a@(Table _ _ a_cv _) b@(Table _ _ b_cv _ ) =
-  if a_cv > b_cv then b else a
+minTable :: Table -> Table -> Table
+minTable a b =
+  if tableScore a > tableScore b then b else a
 
 -- | Applies an instance move to a given node list and instance.
 applyMoveEx :: Bool -- ^ whether to ignore soft errors
@@ -628,7 +632,7 @@ checkSingleStep force ini_tbl target cur_tbl move =
              upd_il = Container.add tgt_idx new_inst ini_il
              upd_plc = (tgt_idx, pri_idx, sec_idx, move, upd_cvar):ini_plc
              upd_tbl = Table upd_nl upd_il upd_cvar upd_plc
-         in compareTables cur_tbl upd_tbl
+         in minTable cur_tbl upd_tbl
 
 -- | Given the status of the current secondary as a valid new node and
 -- the current candidate target node, generate the possible moves for
@@ -679,8 +683,9 @@ checkInstanceMove ::  AlgorithmOptions -- ^ Algorithmic options for balancing
                   -> Table             -- ^ Original table
                   -> Instance.Instance -- ^ Instance to move
                   -> Table             -- ^ Best new table for this instance
-checkInstanceMove opts nodes_idx ini_tbl@(Table nl _ _ _) target =
-  let force = algIgnoreSoftErrors opts
+checkInstanceMove opts nodes_idx ini_tbl target =
+  let nl = tableNodeList ini_tbl
+      force = algIgnoreSoftErrors opts
       disk_moves = algDiskMoves opts
       inst_moves = algInstanceMoves opts
       rest_mig = algRestrictedMigration opts
@@ -715,7 +720,7 @@ checkMove :: AlgorithmOptions       -- ^ Algorithmic options for balancing
              -> [Instance.Instance] -- ^ List of instances still to move
              -> Table               -- ^ The new solution
 checkMove opts nodes_idx ini_tbl victims =
-  let Table _ _ _ ini_plc = ini_tbl
+  let ini_plc = tablePlacement ini_tbl
       -- we're using rwhnf from the Control.Parallel.Strategies
       -- package; we don't need to use rnf as that would force too
       -- much evaluation in single-threaded cases, and in
@@ -724,8 +729,8 @@ checkMove opts nodes_idx ini_tbl victims =
       tables = parMap rwhnf (checkInstanceMove opts nodes_idx ini_tbl)
                victims
       -- iterate over all instances, computing the best move
-      best_tbl = foldl' compareTables ini_tbl tables
-      Table _ _ _ best_plc = best_tbl
+      best_tbl = foldl' minTable ini_tbl tables
+      best_plc = tablePlacement best_tbl
   in if length best_plc == length ini_plc
        then ini_tbl -- no advancement
        else best_tbl
@@ -736,7 +741,8 @@ doNextBalance :: Table     -- ^ The starting table
               -> Score     -- ^ Score at which to stop
               -> Bool      -- ^ The resulting table and commands
 doNextBalance ini_tbl max_rounds min_score =
-  let Table _ _ ini_cv ini_plc = ini_tbl
+  let ini_plc = tablePlacement ini_tbl
+      ini_cv = tableScore ini_tbl
       ini_plc_len = length ini_plc
   in (max_rounds < 0 || ini_plc_len < max_rounds) && ini_cv > min_score
 
@@ -761,7 +767,7 @@ tryBalance opts init_table =
                                    Instance.autoBalance i) all_inst'
         node_idx = map Node.idx online_nodes
         fin_tbl = checkMove opts node_idx init_table reloc_inst
-        (Table _ _ fin_cv _) = fin_tbl
+        fin_cv = tableScore fin_tbl
     in
       if fin_cv < init_score && (  init_score > min_gain_limit
                                 || init_score - fin_cv >= min_gain)
@@ -1601,7 +1607,7 @@ getMoves (Table _ initial_il _ initial_plc, Table final_nl _ _ final_plc) =
           (_, cmds) = computeMoves inst inst_name mv np ns
       in (affected, idx, mv, cmds)
   in map plctoMoves . reverse . drop (length initial_plc) $ reverse final_plc
-             
+
 -- | Inner function for splitJobs, that either appends the next job to
 -- the current jobset, or starts a new jobset.
 mergeJobs :: ([JobSet], [Ndx]) -> MoveJob -> ([JobSet], [Ndx])
