@@ -87,6 +87,7 @@ nodeLiveFieldsDefs =
      "Amount of memory used by node (dom0 for Xen)")
   , ("mtotal", "MTotal", QFTUnit, "memory_total",
      "Total amount of memory of physical machine")
+  , ("storage", "Storage", QFTOther, "storage", storageDoc)
   ]
 
 -- | Helper function to extract an attribute from a maybe StorageType
@@ -146,6 +147,8 @@ nodeLiveFieldExtract "mnode" res =
   jsonHead (rpcResNodeInfoHvInfo res) hvInfoMemoryDom0
 nodeLiveFieldExtract "mtotal" res =
   jsonHead (rpcResNodeInfoHvInfo res) hvInfoMemoryTotal
+nodeLiveFieldExtract "storage" res =
+  J.showJSON $ rpcResNodeInfoStorageInfo res
 nodeLiveFieldExtract _ _ = J.JSNull
 
 -- | Helper for extracting field from RPC result.
@@ -174,6 +177,12 @@ nodeRoleDoc =
    (map (\role ->
           "\"" ++ nodeRoleToRaw role ++ "\" for " ++ roleDescription role)
    (reverse [minBound..maxBound]))
+
+storageDoc :: String
+storageDoc =
+  let descriptions = map storageTypeToRaw [minBound..maxBound]
+      storageTypeList = intercalate ", " descriptions
+  in "Storage; " ++ storageTypeList
 
 -- | Get node powered status.
 getNodePower :: ConfigData -> Node -> ResultEntry
@@ -274,7 +283,7 @@ rpcResultNodeBroken node = (node, Left (RpcResultError "Broken configuration"))
 
 -- | Storage-related query fields
 storageFields :: [String]
-storageFields = ["dtotal", "dfree", "spfree", "sptotal"]
+storageFields = ["dtotal", "dfree", "spfree", "sptotal", "storage"]
 
 -- | Hypervisor-related query fields
 hypervisorFields :: [String]

@@ -99,6 +99,7 @@ N_FIELDS = ["name", "offline", "master_candidate", "drained",
             "master_capable", "vm_capable",
             "ndparams",
             "group.uuid",
+            "storage",
             ] + _COMMON_FIELDS
 
 NET_FIELDS = ["name", "network", "gateway",
