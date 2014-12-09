@@ -105,6 +105,7 @@ Draft designs
    design-hroller.rst
    design-hotplug.rst
    design-internal-shutdown.rst
+   design-iallocator-protocol.rst
    design-kvmd.rst
    design-linuxha.rst
    design-lu-generated-jobs.rst
