@@ -67,10 +67,10 @@ import qualified Ganeti.Utils as Utils
 prop_Load_Instance :: String -> Int -> Int -> Int -> Types.InstanceStatus
                    -> NonEmptyList Char -> String
                    -> NonNegative Int -> NonNegative Int -> Bool
-                   -> Types.DiskTemplate -> Int -> Property
+                   -> Types.DiskTemplate -> Int -> [String] -> Property
 prop_Load_Instance name mem dsk vcpus status
                    (NonEmpty pnode) snode
-                   (NonNegative pdx) (NonNegative sdx) autobal dt su =
+                   (NonNegative pdx) (NonNegative sdx) autobal dt su unknown =
   pnode /= snode && pdx /= sdx ==>
   let vcpus_s = show vcpus
       dsk_s = show dsk
@@ -84,9 +84,10 @@ prop_Load_Instance name mem dsk vcpus status
       tags = ""
       sbal = if autobal then "Y" else "N"
       sdt = Types.diskTemplateToRaw dt
+      spindles = "-"
       inst = Text.loadInst nl
-             [name, mem_s, dsk_s, vcpus_s, status_s,
-              sbal, pnode, snode, sdt, tags, su_s]
+             ([name, mem_s, dsk_s, vcpus_s, status_s,
+               sbal, pnode, snode, sdt, tags, su_s, spindles] ++ unknown)
       fail1 = Text.loadInst nl
               [name, mem_s, dsk_s, vcpus_s, status_s,
                sbal, pnode, pnode, tags]
@@ -107,7 +108,7 @@ prop_Load_Instance name mem dsk vcpus status
 
 prop_Load_InstanceFail :: [(String, Int)] -> [String] -> Property
 prop_Load_InstanceFail ktn fields =
-  length fields < 10 || length fields > 12 ==>
+  length fields < 10 ==>
     case Text.loadInst nl fields of
       Ok _ -> failTest "Managed to load instance from invalid data"
       Bad msg -> counterexample ("Unrecognised error message: " ++ msg) $

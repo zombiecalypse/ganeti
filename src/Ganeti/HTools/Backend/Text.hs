@@ -201,7 +201,7 @@ serializeCluster (ClusterData gl nl il ctags cpol) =
 loadGroup :: (Monad m) => [String]
           -> m (String, Group.Group) -- ^ The result, a tuple of group
                                      -- UUID and group object
-loadGroup [name, gid, apol, tags, nets] = do
+loadGroup (name:gid:apol:tags:nets:_) = do
   xapol <- allocPolicyFromRaw apol
   let xtags = commaSplit tags
   let xnets = commaSplit nets
@@ -269,7 +269,9 @@ loadNode ktg [name, tm, nm, fm, td, fd, tc, fo, gu, spindles, tags,
   loadNode ktg [name, tm, nm, fm, td, fd, tc, fo, gu, spindles, tags,
                 excl_stor, free_spindles, nos_cpu, "1.0"]
 
-loadNode _ s = fail $ "Invalid/incomplete node data: '" ++ show s ++ "'"
+loadNode ktg s
+  | length s > 15 = loadNode ktg $ take 15 s
+  | otherwise = fail $ "Invalid/incomplete node data: '" ++ show s ++ "'"
 
 -- | Load an instance from a field list.
 loadInst :: NameAssoc -- ^ Association list with the current nodes
@@ -316,7 +318,9 @@ loadInst ktn [ name, mem, dsk, vcpus, status, auto_bal, pnode, snode
   loadInst ktn [ name, mem, dsk, vcpus, status, auto_bal, pnode, snode, dt
                , tags, su, "-" ]
 
-loadInst _ s = fail $ "Invalid/incomplete instance data: '" ++ show s ++ "'"
+loadInst ktn s
+  | length s > 12 = loadInst ktn $ take 12 s
+  | otherwise = fail $ "Invalid/incomplete instance data: '" ++ show s ++ "'"
 
 -- | Loads a spec from a field list.
 loadISpec :: String -> [String] -> Result ISpec
@@ -328,7 +332,9 @@ loadISpec owner [mem_s, cpu_c, dsk_s, dsk_c, nic_c, su] = do
   xnic_c <- tryRead (owner ++ "/niccount") nic_c
   xsu    <- tryRead (owner ++ "/spindleuse") su
   return $ ISpec xmem_s xcpu_c xdsk_s xdsk_c xnic_c xsu
-loadISpec owner s = fail $ "Invalid ispec data for " ++ owner ++ ": " ++ show s
+loadISpec owner s
+  | length s > 6 = loadISpec owner $ take 6 s
+  | otherwise = fail $ "Invalid ispec data for " ++ owner ++ ": " ++ show s
 
 -- | Load a single min/max ISpec pair
 loadMinMaxISpecs :: String -> String -> String -> Result MinMaxISpecs
@@ -366,7 +372,9 @@ loadIPolicy [owner, stdspec, minmaxspecs, dtemplates,
   return (owner,
           IPolicy xminmaxspecs xstdspec
                 xdts xvcpu_ratio xspindle_ratio)
-loadIPolicy s = fail $ "Invalid ipolicy data: '" ++ show s ++ "'"
+loadIPolicy s
+  | length s > 6 = loadIPolicy $ take 6 s
+  | otherwise = fail $ "Invalid ipolicy data: '" ++ show s ++ "'"
 
 loadOnePolicy :: (IPolicy, Group.List) -> String
               -> Result (IPolicy, Group.List)
@@ -420,10 +428,11 @@ parseData fdata = do
   let flines = lines fdata
   (glines, nlines, ilines, ctags, pollines) <-
       case sepSplit "" flines of
-        [a, b, c, d, e] -> Ok (a, b, c, d, e)
+        -- Ignore sections we don't know about
+        (a:b:c:d:e:_) -> Ok (a, b, c, d, e)
         [a, b, c, d] -> Ok (a, b, c, d, [])
         xs -> Bad $ printf "Invalid format of the input file: %d sections\
-                           \ instead of 4 or 5" (length xs)
+                           \ instead of 4 or more" (length xs)
   {- group file: name uuid alloc_policy -}
   (ktg, gl) <- loadTabular glines loadGroup
   {- node file: name t_mem n_mem f_mem t_disk f_disk t_cpu offline grp_uuid
