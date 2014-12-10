@@ -1643,6 +1643,7 @@ TEST_FILES = \
 	test/data/htools/clean-nonzero-score.data \
 	test/data/htools/common-suffix.data \
 	test/data/htools/empty-cluster.data \
+	test/data/htools/extra-fields.data \
 	test/data/htools/hail-alloc-drbd.json \
 	test/data/htools/hail-alloc-invalid-network.json \
 	test/data/htools/hail-alloc-invalid-twodisks.json \

@@ -28,3 +28,8 @@
 ./test/hs/hinfo -t $TESTDATA_DIR/invalid-node.data
 >>>2 /Unknown node '.*' for instance new-0/
 >>>= !0
+
+# Ignoring unknown fields
+./test/hs/hbal -t $TESTDATA_DIR/extra-fields.data
+>>>/Cluster is empty, exiting/
+>>>= 0
