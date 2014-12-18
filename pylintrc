@@ -64,7 +64,7 @@ max-returns = 10
 max-branchs = 80
 max-statements = 200
 max-parents = 7
-max-attributes = 20
+max-attributes = 19
 # zero as struct-like (PODS) classes don't export any methods
 min-public-methods = 0
 max-public-methods = 50
