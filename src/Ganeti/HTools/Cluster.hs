@@ -1095,10 +1095,6 @@ nodeEvacInstance _ _ _ _ (Instance.Instance
                   fail "Instances of type plain cannot be relocated"
 
 nodeEvacInstance _ _ _ _ (Instance.Instance
-                          {Instance.diskTemplate = DTMixed}) _ _ =
-                  fail "Instances of type mixed cannot be relocated yet"
-
-nodeEvacInstance _ _ _ _ (Instance.Instance
                           {Instance.diskTemplate = DTFile}) _ _ =
                   fail "Instances of type file cannot be relocated"
 

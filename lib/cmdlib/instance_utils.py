@@ -332,7 +332,6 @@ def RemoveDisks(lu, instance, disks=None,
   ports_to_release = set()
 
   all_disks = lu.cfg.GetInstanceDisks(instance.uuid)
-  disk_count = len(instance.disks)
   if disks is None:
     disks = all_disks
 
