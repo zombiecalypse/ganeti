@@ -111,8 +111,9 @@ def FillDiskParams(default_dparams, custom_dparams, skip_keys=None):
   @see: L{FillDict} for parameters and return value
 
   """
-  return dict((dt, FillDict(default_dparams.get(dt, {}), custom_dparams.get(dt, {}),
-                             skip_keys=skip_keys))
+  return dict((dt, FillDict(default_dparams.get(dt, {}),
+                            custom_dparams.get(dt, {}),
+                            skip_keys=skip_keys))
               for dt in constants.DISK_TEMPLATES)
 
 
