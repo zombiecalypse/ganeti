@@ -111,9 +111,7 @@ def FillDiskParams(default_dparams, custom_dparams, skip_keys=None):
   @see: L{FillDict} for parameters and return value
 
   """
-  assert frozenset(default_dparams.keys()) == constants.DISK_TEMPLATES
-
-  return dict((dt, FillDict(default_dparams[dt], custom_dparams.get(dt, {}),
+  return dict((dt, FillDict(default_dparams.get(dt, {}), custom_dparams.get(dt, {}),
                              skip_keys=skip_keys))
               for dt in constants.DISK_TEMPLATES)
 
