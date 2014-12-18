@@ -897,7 +897,7 @@ dtGluster :: String
 dtGluster = Types.diskTemplateToRaw DTGluster
 
 dtMixed :: String
-dtMixed = Types.diskTemplateToRaw DTMixed
+dtMixed = "mixed"
 
 -- | This is used to order determine the default disk template when
 -- the list of enabled disk templates is inferred from the current

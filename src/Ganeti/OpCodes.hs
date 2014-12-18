@@ -879,7 +879,7 @@ $(genOpCode "OpCode"
      , pIAllocatorMemory
      , pIAllocatorVCpus
      , pIAllocatorOs
-     , pDiskTemplate
+     , pOptDiskTemplate
      , pIAllocatorInstances
      , pIAllocatorEvacMode
      , pTargetGroups

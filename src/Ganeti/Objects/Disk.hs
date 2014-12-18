@@ -236,8 +236,6 @@ decodeDLId obj lid = do
         _ -> fail "Can't read logical_id for extstorage type"
     DTDiskless ->
       fail "Retrieved 'diskless' disk."
-    DTMixed ->
-      fail "Retrieved 'mixed' disk."
 
 -- | Disk data structure.
 
