@@ -453,10 +453,11 @@ class TestNodeQuery(unittest.TestCase):
       "dtotal": 100 * 1024 * 1024,
       "spfree": 0,
       "sptotal": 0,
+      "storage": {}
       }
 
-    assert (sorted(query._NODE_LIVE_FIELDS.keys()) ==
-            sorted(fake_live_data.keys()))
+    self.assertEqual(sorted(query._NODE_LIVE_FIELDS.keys()),
+                     sorted(fake_live_data.keys()))
 
     live_data = dict.fromkeys([node.uuid for node in nodes], {})
     live_data[live_data_node.uuid] = \

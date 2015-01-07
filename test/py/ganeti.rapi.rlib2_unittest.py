@@ -160,6 +160,7 @@ class TestConstants(unittest.TestCase):
       constants.QR_GROUP: rlib2.G_FIELDS,
       }
 
+
     for (qr, fields) in checks.items():
       self.assertFalse(set(fields) - set(query.ALL_FIELDS[qr].keys()))
 
