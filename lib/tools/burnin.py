@@ -346,7 +346,9 @@ class JobHandler(FeedbackAccumulator):
 
   queued_ops = []
   queue_retry = False
-  cl = cli.GetClient()
+
+  def __init__(self):
+    self.cl = cli.GetClient()
 
   def MaybeRetry(self, retry_count, msg, fn, *args):
     """Possibly retry a given function execution.
