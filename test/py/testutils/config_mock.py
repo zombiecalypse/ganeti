@@ -595,7 +595,14 @@ class ConfigMock(config.ConfigWriter):
     cluster.ipolicy[constants.IPOLICY_DTS] = list(enabled_disk_templates)
 
   def ComputeDRBDMap(self):
-    return dict((node_uuid, {}) for node_uuid in self._ConfigData().nodes)
+    disks = self._ConfigData().disks
+    drbd_map = dict()
+    for node_uuid in self._ConfigData().nodes:
+      drbd_map[node_uuid] = {}
+    for i, disk_info in enumerate(disks.values()):
+      if node_uuid in disk_info.nodes:
+        drbd_map.setdefault(node_uuid, {})[i] = disk_info.uuid
+    return drbd_map
 
   def AllocateDRBDMinor(self, node_uuids, disk_uuid):
     return map(lambda _: 0, node_uuids)

@@ -1085,6 +1085,7 @@ class TestLUClusterVerifyConfig(CmdlibTestCase):
     self.cfg.AddNewInstance()
     op = opcodes.OpClusterVerifyConfig()
     result = self.ExecOpCode(op)
+    self.mcpu.assertLogDoesNotContainRegex('ERROR')
     self.assertTrue(result)
 
   def testDanglingNode(self):
@@ -1164,6 +1165,26 @@ class TestLUClusterVerifyGroup(CmdlibTestCase):
     op = opcodes.OpClusterVerifyGroup(group_name="default", verbose=True)
 
     self.ExecOpCode(op)
+
+  def testSuccessfulDrbdRun(self):
+    node1 = self.cfg.AddNewNode()
+    client_cert = "client-cert-digest"
+
+    self.rpc.call_node_verify.return_value = \
+      RpcResultsBuilder() \
+        .AddSuccessfulNode(self.master,
+          {constants.NV_CLIENT_CERT: (None, client_cert)}) \
+        .AddSuccessfulNode(node1,
+          {constants.NV_CLIENT_CERT: (None, client_cert)}) \
+        .Build()
+
+    disk = self.cfg.CreateDisk(dev_type=constants.DT_DRBD8,
+                               primary_node=self.master,
+                               secondary_node=node1)
+    op = opcodes.OpClusterVerifyGroup(group_name="default", verbose=True)
+    result = self.ExecOpCode(op)
+    self.mcpu.assertLogDoesNotContainRegex('ERROR')
+    self.assertTrue(result)
 
 
 class TestLUClusterVerifyClientCerts(CmdlibTestCase):
