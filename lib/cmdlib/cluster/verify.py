@@ -1212,7 +1212,7 @@ class LUClusterVerifyGroup(LogicalUnit, _VerifyErrors):
         for (inst_uuid, inst) in instanceinfo.items():
           if disk_uuid in inst.disks:
             disk_active = inst.disks_active
-            disk_instance = inst.name
+            disk_instance = inst.uuid
             break
         node_drbd[minor] = (disk_uuid, disk_instance, disk_active)
 
