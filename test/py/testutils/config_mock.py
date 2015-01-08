@@ -447,13 +447,13 @@ class ConfigMock(config.ConfigWriter):
       if logical_id is None:
         logical_id = ("mockvg", "mock_disk_%d" % disk_id)
       if nodes is None and primary_node is not None:
-          nodes = [primary_node]
+        nodes = [primary_node]
     elif dev_type in constants.DTS_FILEBASED:
       if logical_id is None:
         logical_id = (constants.FD_LOOP, "/file/storage/disk%d" % disk_id)
       if (nodes is None and primary_node is not None and
           dev_type == constants.DT_FILE):
-          nodes = [primary_node]
+        nodes = [primary_node]
     elif dev_type == constants.DT_BLOCK:
       if logical_id is None:
         logical_id = (constants.BLOCKDEV_DRIVER_MANUAL,
