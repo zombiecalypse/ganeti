@@ -497,6 +497,7 @@ $(THH.declareLADT ''String "StorageType"
   , ("StorageBlock", "blockdev")
   , ("StorageRados", "rados")
   , ("StorageExt", "ext")
+  , ("StorageDrbd", "drbd8")
   ])
 $(THH.makeJSONInstance ''StorageType)
 
@@ -521,6 +522,7 @@ data StorageUnit = SUFile StorageKey
                  | SUBlock StorageKey
                  | SURados StorageKey
                  | SUExt StorageKey
+                 | SUDrbd StorageKey
                  deriving (Eq)
 
 instance Show StorageUnit where
@@ -533,6 +535,7 @@ instance Show StorageUnit where
   show (SUBlock key) = showSUSimple StorageBlock key
   show (SURados key) = showSUSimple StorageRados key
   show (SUExt key) = showSUSimple StorageExt key
+  show (SUDrbd key) = showSUSimple StorageDrbd key
 
 instance JSON StorageUnit where
   showJSON (SUFile key) = showJSON (StorageFile, key, []::[String])
@@ -544,6 +547,7 @@ instance JSON StorageUnit where
   showJSON (SUBlock key) = showJSON (StorageBlock, key, []::[String])
   showJSON (SURados key) = showJSON (StorageRados, key, []::[String])
   showJSON (SUExt key) = showJSON (StorageExt, key, []::[String])
+  showJSON (SUDrbd key) = showJSON (StorageDrbd, key, []::[String])
 -- FIXME: add readJSON implementation
   readJSON = fail "Not implemented"
 
@@ -561,7 +565,7 @@ diskTemplateToStorageType :: DiskTemplate -> StorageType
 diskTemplateToStorageType DTExt = StorageExt
 diskTemplateToStorageType DTFile = StorageFile
 diskTemplateToStorageType DTSharedFile = StorageSharedFile
-diskTemplateToStorageType DTDrbd8 = StorageLvmVg
+diskTemplateToStorageType DTDrbd8 = StorageDrbd
 diskTemplateToStorageType DTPlain = StorageLvmVg
 diskTemplateToStorageType DTRbd = StorageRados
 diskTemplateToStorageType DTDiskless = StorageDiskless
@@ -579,6 +583,7 @@ addParamsToStorageUnit _ (SURaw StorageGluster key) = SUGluster key
 addParamsToStorageUnit es (SURaw StorageLvmPv key) = SULvmPv key es
 addParamsToStorageUnit es (SURaw StorageLvmVg key) = SULvmVg key es
 addParamsToStorageUnit _ (SURaw StorageRados key) = SURados key
+addParamsToStorageUnit _ (SURaw StorageDrbd key) = SUDrbd key
 
 -- | Node evac modes.
 --

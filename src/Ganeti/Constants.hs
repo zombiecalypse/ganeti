@@ -765,12 +765,15 @@ stLvmVg = Types.storageTypeToRaw StorageLvmVg
 stRados :: String
 stRados = Types.storageTypeToRaw StorageRados
 
+stDrbd :: String
+stDrbd = Types.storageTypeToRaw StorageDrbd
+
 storageTypes :: FrozenSet String
 storageTypes = ConstantUtils.mkSet $ map Types.storageTypeToRaw [minBound..]
 
 -- | The set of storage types for which full storage reporting is available
 stsReport :: FrozenSet String
-stsReport = ConstantUtils.mkSet [stFile, stLvmPv, stLvmVg]
+stsReport = ConstantUtils.mkSet [stFile, stLvmPv, stLvmVg, stDrbd]
 
 -- | The set of storage types for which node storage reporting is available
 -- | (as used by LUQueryNodeStorage)

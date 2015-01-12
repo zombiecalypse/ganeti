@@ -52,12 +52,18 @@ class TestGetStorageUnitForDiskTemplate(unittest.TestCase):
     self._cfg.GetClusterInfo = mock.Mock(return_value=self._cluster)
 
   def testGetDefaultStorageUnitForDiskTemplateLvm(self):
-    for disk_template in [constants.DT_DRBD8, constants.DT_PLAIN]:
-      (storage_type, storage_key) = \
-          storage._GetDefaultStorageUnitForDiskTemplate(self._cfg,
-                                                        disk_template)
-      self.assertEqual(storage_type, constants.ST_LVM_VG)
-      self.assertEqual(storage_key, self._default_vg_name)
+    (storage_type, storage_key) = \
+        storage._GetDefaultStorageUnitForDiskTemplate(self._cfg,
+                                                      constants.DT_PLAIN)
+    self.assertEqual(storage_type, constants.ST_LVM_VG)
+    self.assertEqual(storage_key, self._default_vg_name)
+
+  def testGetDefaultStorageUnitForDiskTemplateDrbd(self):
+    (storage_type, storage_key) = \
+        storage._GetDefaultStorageUnitForDiskTemplate(self._cfg,
+                                                      constants.DT_DRBD8)
+    self.assertEqual(storage_type, constants.ST_DRBD)
+    self.assertEqual(storage_key, self._default_vg_name)
 
   def testGetDefaultStorageUnitForDiskTemplateFile(self):
     (storage_type, storage_key) = \

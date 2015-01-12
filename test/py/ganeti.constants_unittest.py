@@ -176,7 +176,8 @@ class TestDiskTemplateConstants(unittest.TestCase):
   def testLvmDiskTemplates(self):
     lvm_by_storage_type = [
         dt for dt in constants.DISK_TEMPLATES
-        if constants.ST_LVM_VG == constants.MAP_DISK_TEMPLATE_STORAGE_TYPE[dt]]
+        if constants.MAP_DISK_TEMPLATE_STORAGE_TYPE[dt]
+            in (constants.ST_LVM_VG, constants.ST_DRBD)]
     self.assertEqual(set(lvm_by_storage_type), set(constants.DTS_LVM))
 
 
