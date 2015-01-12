@@ -219,13 +219,14 @@ loadNode :: (Monad m) =>
          -> m (String, Node.Node) -- ^ The result, a tuple o node name
                                   -- and node object
 loadNode ktg [name, tm, nm, fm, td, fd, tc, fo, gu, spindles, tags,
-              excl_stor, free_spindles, nos_cpu, cpu_speed] = do
+              excl_stor, free_spindles, nos_cpu, cpu_speed, storage] = do
   gdx <- lookupGroup ktg name gu
   new_node <-
       if "?" `elem` [tm,nm,fm,td,fd,tc] then
-          return $ Node.create name 0 0 0 0 0 0 0 True 0 0 gdx False
+          return $ Node.create name 0 0 0 0 0 0 0 True 0 0 gdx False Nothing
       else do
         let vtags = commaSplit tags
+            storageInfo = loadStorage storage
         vtm <- tryRead name tm
         vnm <- tryRead name nm
         vfm <- tryRead name fm
@@ -245,7 +246,7 @@ loadNode ktg [name, tm, nm, fm, td, fd, tc, fo, gu, spindles, tags,
         return . flip Node.setMaster (fo == "M") . flip Node.setNodeTags vtags
           . flip Node.setCpuSpeed vcpu_speed
           $ Node.create name vtm vnm vfm vtd vfd vtc vnc (fo == "Y") vspindles
-            vfree_spindles gdx vexcl_stor
+            vfree_spindles gdx vexcl_stor storageInfo
   return (name, new_node)
 
 loadNode ktg [name, tm, nm, fm, td, fd, tc, fo, gu] =
@@ -272,9 +273,17 @@ loadNode ktg [name, tm, nm, fm, td, fd, tc, fo, gu, spindles, tags,
   loadNode ktg [name, tm, nm, fm, td, fd, tc, fo, gu, spindles, tags,
                 excl_stor, free_spindles, nos_cpu, "1.0"]
 
+loadNode ktg [name, tm, nm, fm, td, fd, tc, fo, gu, spindles, tags,
+              excl_stor, free_spindles, nos_cpu, cpu_speed] =
+  loadNode ktg [name, tm, nm, fm, td, fd, tc, fo, gu, spindles, tags,
+                excl_stor, free_spindles, nos_cpu, cpu_speed, ""]
+
 loadNode ktg s
   | length s > 15 = loadNode ktg $ take 15 s
   | otherwise = fail $ "Invalid/incomplete node data: '" ++ show s ++ "'"
+
+loadStorage :: String -> Maybe [Node.StorageStats]
+loadStorage = undefined
 
 -- | Load an instance from a field list.
 loadInst :: NameAssoc -- ^ Association list with the current nodes

@@ -99,6 +99,7 @@ import Control.Monad (unless)
 import qualified Data.IntSet as IntSet
 import Data.List
 import Data.Maybe (fromJust, fromMaybe, isJust, isNothing)
+import qualified Data.Map as Map
 import Data.Ord (comparing)
 import Text.Printf (printf)
 
@@ -116,6 +117,7 @@ import qualified Ganeti.OpCodes as OpCodes
 import Ganeti.Utils
 import Ganeti.Utils.Statistics
 import Ganeti.Types (EvacMode(..), mkNonEmpty, mkNonNegative)
+import qualified Ganeti.Types as GT
 
 -- * Types
 
@@ -179,15 +181,6 @@ data Table = Table {
   tablePlacement :: [Placement]
   } deriving (Show)
 
--- | The information about available storage units on a node.
-data StorageStats = StorageStats {
-  storageUnit :: StorageUnit, -- ^ Cross-node identifier for this storage
-  storageFree :: Integer, -- ^ amount of available space for this configuration
-                          -- on this node.
-  storageTotal :: Integer -- ^ total amount of space for this configuration
-                          -- on this node.
-  } deriving (Show)
-
 -- | Cluster statistics data type.
 data CStats = CStats
   { csFmem :: Integer -- ^ Cluster free mem
@@ -214,7 +207,9 @@ data CStats = CStats
   , csNmem :: Integer -- ^ Node own memory
   , csScore :: Score  -- ^ The cluster score
   , csNinst :: Int    -- ^ The total number of instances
-  , csStorage :: [StorageStats]
+  , csStorage :: Map.Map GT.StorageUnit [(Integer, Integer)]
+    -- ^ Collection of storage units on different nodes and their free and
+    -- total space
   } deriving (Show)
 
 -- | A simple type for allocation functions.
@@ -269,19 +264,22 @@ instanceNodes nl inst =
 
 -- | Zero-initializer for the CStats type.
 emptyCStats :: CStats
-emptyCStats = CStats 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+emptyCStats = CStats 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 Map.empty
 
 -- | Update stats with data from a new node.
 updateCStats :: CStats -> Node.Node -> CStats
 updateCStats cs node =
-  let CStats { csFmem = x_fmem, csFdsk = x_fdsk,
+  let addBins :: Map.Map GT.StorageUnit [(Integer, Integer)] -> Node.StorageStats -> Map.Map GT.StorageUnit [(Integer, Integer)]
+      addBins = undefined
+      CStats { csFmem = x_fmem, csFdsk = x_fdsk,
                csAmem = x_amem, csAcpu = x_acpu, csAdsk = x_adsk,
                csMmem = x_mmem, csMdsk = x_mdsk, csMcpu = x_mcpu,
                csImem = x_imem, csIdsk = x_idsk, csIcpu = x_icpu,
                csTmem = x_tmem, csTdsk = x_tdsk, csTcpu = x_tcpu,
                csVcpu = x_vcpu, csNcpu = x_ncpu,
                csXmem = x_xmem, csNmem = x_nmem, csNinst = x_ninst,
-               csFspn = x_fspn, csIspn = x_ispn, csTspn = x_tspn
+               csFspn = x_fspn, csIspn = x_ispn, csTspn = x_tspn,
+               csStorage = x_storage
              }
         = cs
       inc_amem = Node.fMem node - Node.rMem node
@@ -318,6 +316,7 @@ updateCStats cs node =
         , csXmem = x_xmem + fromIntegral (Node.xMem node)
         , csNmem = x_nmem + fromIntegral (Node.nMem node)
         , csNinst = x_ninst + length (Node.pList node)
+        , csStorage = maybe Map.empty (foldl addBins x_storage) (Node.storageStats node)
         }
 
 -- | Compute the total free disk and memory in the cluster.

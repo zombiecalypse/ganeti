@@ -105,7 +105,7 @@ genNode min_multiplier max_multiplier = do
   spindles <- choose (base_spindles, top_spindles)
   let n = Node.create name (fromIntegral mem_t) mem_n mem_f
           (fromIntegral dsk_t) dsk_f (fromIntegral cpu_t) cpu_n offl spindles
-          0 0 False
+          0 0 False Nothing
       n' = Node.setPolicy nullIPolicy n
   return $ Node.buildPeers n' Container.empty
 

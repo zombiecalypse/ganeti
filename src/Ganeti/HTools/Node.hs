@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module Ganeti.HTools.Node
   ( Node(..)
+  , StorageStats(..)
   , List
   , pCpuEff
   , pCpuEffForth
@@ -109,6 +110,7 @@ import qualified Data.Map as Map
 import Data.Ord (comparing)
 import qualified Data.Set as Set
 import Text.Printf (printf)
+import qualified Text.JSON as J
 
 import qualified Ganeti.Constants as C
 import qualified Ganeti.OpCodes as OpCodes
@@ -121,11 +123,30 @@ import qualified Ganeti.HTools.PeerMap as P
 
 import Ganeti.BasicTypes
 import qualified Ganeti.HTools.Types as T
+import qualified Ganeti.Types as GT
 
 -- * Type declarations
 
 -- | The tag map type.
 type TagMap = Map.Map String Int
+
+-- | The information about available storage units on a node.
+data StorageStats = StorageStats {
+  storageUnit :: GT.StorageUnit, -- ^ Cross-node identifier for this storage
+  storageFree :: Integer, -- ^ amount of available space for this configuration
+                          -- on this node.
+  storageTotal :: Integer -- ^ total amount of space for this configuration
+                          -- on this node.
+  } deriving (Show, Eq)
+
+instance J.JSON StorageStats where
+  readJSON (J.JSArray [type_, key, params]) =
+    StorageStats 
+          <$> J.readJSON type_
+          <*> J.readJSON key
+          <*> J.readJSON params
+  readJSON s = fail $ "Invalid storage: '" ++ J.encode s ++ "'"
+  showJSON _ = undefined
 
 -- | The node type.
 data Node = Node
@@ -205,6 +226,9 @@ data Node = Node
   , exclStorage :: Bool   -- ^ Effective value of exclusive_storage
   , migTags  :: Set.Set String -- ^ migration-relevant tags
   , rmigTags :: Set.Set String -- ^ migration tags able to receive
+  , storageStats :: Maybe [StorageStats]
+     -- ^ information of compatible storage and
+     -- free/total space
   } deriving (Show, Eq)
 {- A note on how we handle spindles
 
@@ -306,11 +330,11 @@ haveExclStorage nl =
 -- update later via the 'setIdx' and 'buildPeers' functions.
 create :: String -> Double -> Int -> Int
        -> Double -> Int -> Double -> Int -> Bool
-       -> Int -> Int -> T.Gdx -> Bool
+       -> Int -> Int -> T.Gdx -> Bool -> Maybe [StorageStats]
        -> Node
 create name_init mem_t_init mem_n_init mem_f_init
        dsk_t_init dsk_f_init cpu_t_init cpu_n_init offline_init
-       spindles_t_init spindles_f_init group_init excl_stor =
+       spindles_t_init spindles_f_init group_init excl_stor storage =
   Node { name = name_init
        , alias = name_init
        , tMem = mem_t_init
@@ -371,6 +395,7 @@ create name_init mem_t_init mem_n_init mem_f_init
        , exclStorage = excl_stor
        , migTags = Set.empty
        , rmigTags = Set.empty
+       , storageStats = storage
        }
 
 -- | Conversion formula from mDsk\/tDsk to loDsk.

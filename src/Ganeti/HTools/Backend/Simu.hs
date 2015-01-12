@@ -95,6 +95,7 @@ createGroup grpIndex spec = do
                       (fromIntegral mem) 0 mem
                       (fromIntegral disk) disk
                       (fromIntegral cpu) 1 False spindles 0 grpIndex excl_stor
+                      Nothing
                   ) [1..ncount]
       -- TODO: parse networks to which this group is connected
       grp = Group.create (printf "group-%02d" grpIndex)
