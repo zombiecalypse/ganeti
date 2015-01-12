@@ -179,6 +179,15 @@ data Table = Table {
   tablePlacement :: [Placement]
   } deriving (Show)
 
+-- | The information about available storage units on a node.
+data StorageStats = StorageStats {
+  storageUnit :: StorageUnit, -- ^ Cross-node identifier for this storage
+  storageFree :: Integer, -- ^ amount of available space for this configuration
+                          -- on this node.
+  storageTotal :: Integer -- ^ total amount of space for this configuration
+                          -- on this node.
+  } deriving (Show)
+
 -- | Cluster statistics data type.
 data CStats = CStats
   { csFmem :: Integer -- ^ Cluster free mem
@@ -205,6 +214,7 @@ data CStats = CStats
   , csNmem :: Integer -- ^ Node own memory
   , csScore :: Score  -- ^ The cluster score
   , csNinst :: Int    -- ^ The total number of instances
+  , csStorage :: [StorageStats]
   } deriving (Show)
 
 -- | A simple type for allocation functions.
