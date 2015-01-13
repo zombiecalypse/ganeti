@@ -146,7 +146,10 @@ instance J.JSON StorageStats where
           <*> J.readJSON key
           <*> J.readJSON params
   readJSON s = fail $ "Invalid storage: '" ++ J.encode s ++ "'"
-  showJSON _ = undefined
+  showJSON storage = J.showJSON [ J.showJSON $ storageUnit storage
+                                , J.showJSON $ storageFree storage
+                                , J.showJSON $ storageTotal storage
+                                ]
 
 -- | The node type.
 data Node = Node
