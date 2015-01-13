@@ -93,13 +93,16 @@ module Ganeti.HTools.Cluster
   , splitCluster
   ) where
 
-import Control.Applicative ((<$>), liftA2)
+import Control.Applicative ((<$>),(<*>), liftA2)
 import Control.Arrow ((&&&))
 import Control.Monad (unless)
+import Data.Foldable (foldMap)
+import Data.Function (on)
 import qualified Data.IntSet as IntSet
 import Data.List
 import Data.Maybe (fromJust, fromMaybe, isJust, isNothing)
 import qualified Data.Map as Map
+import Data.Monoid
 import Data.Ord (comparing)
 import Text.Printf (printf)
 
@@ -181,6 +184,18 @@ data Table = Table {
   tablePlacement :: [Placement]
   } deriving (Show)
 
+newtype StorageTable = StorageTable (Maybe (Map.Map GT.StorageUnit
+                                                    (Sum Integer, Sum Integer)))
+  deriving (Show, Eq)
+
+instance Monoid StorageTable where
+  mempty = StorageTable Nothing
+  mappend (StorageTable Nothing) a = a
+  mappend a (StorageTable Nothing) = a
+  mappend (StorageTable (Just left)) (StorageTable (Just right)) =
+    let joined = Map.unionWith mappend left right
+    in StorageTable $ Just joined
+
 -- | Cluster statistics data type.
 data CStats = CStats
   { csFmem :: Integer -- ^ Cluster free mem
@@ -202,16 +217,44 @@ data CStats = CStats
   , csTcpu :: Double  -- ^ Cluster total cpus
   , csVcpu :: Integer -- ^ Cluster total virtual cpus
   , csNcpu :: Double  -- ^ Equivalent to 'csIcpu' but in terms of
-                      -- physical CPUs, i.e. normalised used phys CPUs
+                  -- physical CPUs, i.e. normalised used phys CPUs
   , csXmem :: Integer -- ^ Unnacounted for mem
   , csNmem :: Integer -- ^ Node own memory
   , csScore :: Score  -- ^ The cluster score
   , csNinst :: Int    -- ^ The total number of instances
-  , csStorage :: Map.Map GT.StorageUnit [(Integer, Integer)]
+  , csStorage :: StorageTable
     -- ^ Collection of storage units on different nodes and their free and
     -- total space
   } deriving (Show)
 
+instance Monoid CStats where
+  mempty = CStats 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 mempty
+  mappend a b = CStats
+    { csFmem = ((+) `on` csFmem) a b
+    , csFdsk = ((+) `on` csFdsk) a b
+    , csFspn = ((+) `on` csFspn) a b
+    , csAmem = ((+) `on` csAmem) a b
+    , csAdsk = ((+) `on` csAdsk) a b
+    , csAcpu = ((+) `on` csAcpu) a b
+    , csMmem = (max `on` csMmem) a b
+    , csMdsk = (max `on` csMdsk) a b
+    , csMcpu = (max `on` csMcpu) a b
+    , csImem = ((+) `on` csImem) a b
+    , csIdsk = ((+) `on` csIdsk) a b
+    , csIspn = ((+) `on` csIspn) a b
+    , csIcpu = ((+) `on` csIcpu) a b
+    , csTmem = ((+) `on` csTmem) a b
+    , csTdsk = ((+) `on` csTdsk) a b
+    , csTspn = ((+) `on` csTspn) a b
+    , csTcpu = ((+) `on` csTcpu) a b
+    , csVcpu = ((+) `on` csVcpu) a b
+    , csNcpu = ((+) `on` csNcpu) a b
+    , csXmem = ((+) `on` csXmem) a b
+    , csNmem = ((+) `on` csNmem) a b
+    , csScore = ((+) `on` csScore) a b
+    , csNinst = ((+) `on` csNinst) a b
+    , csStorage = (mappend `on` csStorage) a b
+    }
 -- | A simple type for allocation functions.
 type AllocMethod =  Node.List           -- ^ Node list
                  -> Instance.List       -- ^ Instance list
@@ -262,67 +305,48 @@ instanceNodes nl inst =
       old_s = Container.find old_sdx nl
   in (old_pdx, old_sdx, old_p, old_s)
 
--- | Zero-initializer for the CStats type.
-emptyCStats :: CStats
-emptyCStats = CStats 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 Map.empty
-
--- | Update stats with data from a new node.
-updateCStats :: CStats -> Node.Node -> CStats
-updateCStats cs node =
-  let addBins :: Map.Map GT.StorageUnit [(Integer, Integer)] -> Node.StorageStats -> Map.Map GT.StorageUnit [(Integer, Integer)]
-      addBins = undefined
-      CStats { csFmem = x_fmem, csFdsk = x_fdsk,
-               csAmem = x_amem, csAcpu = x_acpu, csAdsk = x_adsk,
-               csMmem = x_mmem, csMdsk = x_mdsk, csMcpu = x_mcpu,
-               csImem = x_imem, csIdsk = x_idsk, csIcpu = x_icpu,
-               csTmem = x_tmem, csTdsk = x_tdsk, csTcpu = x_tcpu,
-               csVcpu = x_vcpu, csNcpu = x_ncpu,
-               csXmem = x_xmem, csNmem = x_nmem, csNinst = x_ninst,
-               csFspn = x_fspn, csIspn = x_ispn, csTspn = x_tspn,
-               csStorage = x_storage
-             }
-        = cs
-      inc_amem = Node.fMem node - Node.rMem node
-      inc_amem' = if inc_amem > 0 then inc_amem else 0
-      inc_adsk = Node.availDisk node
-      inc_imem = truncate (Node.tMem node) - Node.nMem node
-                 - Node.xMem node - Node.fMem node
-      inc_icpu = Node.uCpu node
-      inc_idsk = truncate (Node.tDsk node) - Node.fDsk node
-      inc_ispn = Node.tSpindles node - Node.fSpindles node
-      inc_vcpu = Node.hiCpu node
-      inc_acpu = Node.availCpu node
-      inc_ncpu = fromIntegral (Node.uCpu node) /
-                 iPolicyVcpuRatio (Node.iPolicy node)
-  in cs { csFmem = x_fmem + fromIntegral (Node.fMem node)
-        , csFdsk = x_fdsk + fromIntegral (Node.fDsk node)
-        , csFspn = x_fspn + fromIntegral (Node.fSpindles node)
-        , csAmem = x_amem + fromIntegral inc_amem'
-        , csAdsk = x_adsk + fromIntegral inc_adsk
-        , csAcpu = x_acpu + fromIntegral inc_acpu
-        , csMmem = max x_mmem (fromIntegral inc_amem')
-        , csMdsk = max x_mdsk (fromIntegral inc_adsk)
-        , csMcpu = max x_mcpu (fromIntegral inc_acpu)
-        , csImem = x_imem + fromIntegral inc_imem
-        , csIdsk = x_idsk + fromIntegral inc_idsk
-        , csIspn = x_ispn + fromIntegral inc_ispn
-        , csIcpu = x_icpu + fromIntegral inc_icpu
-        , csTmem = x_tmem + Node.tMem node
-        , csTdsk = x_tdsk + Node.tDsk node
-        , csTspn = x_tspn + fromIntegral (Node.tSpindles node)
-        , csTcpu = x_tcpu + Node.tCpu node
-        , csVcpu = x_vcpu + fromIntegral inc_vcpu
-        , csNcpu = x_ncpu + inc_ncpu
-        , csXmem = x_xmem + fromIntegral (Node.xMem node)
-        , csNmem = x_nmem + fromIntegral (Node.nMem node)
-        , csNinst = x_ninst + length (Node.pList node)
-        , csStorage = maybe Map.empty (foldl addBins x_storage) (Node.storageStats node)
-        }
+nodeToCstat :: Node.Node -> CStats
+nodeToCstat n =
+  let amem node = fromIntegral $ max 0 $ Node.fMem node - Node.rMem node
+      idsk node = fromIntegral $ truncate (Node.tDsk node) - Node.fDsk node
+      ispn node = fromIntegral $ Node.tSpindles node - Node.fSpindles node
+      ncpu node = fromIntegral (Node.uCpu node) /
+                  iPolicyVcpuRatio (Node.iPolicy node)
+      imem node = fromIntegral $ truncate (Node.tMem node) - Node.nMem node
+                                 - Node.xMem node - Node.fMem node
+      toStoragePoint = Node.storageUnit &&& (Sum . Node.storageFree &&&
+                                             Sum . Node.storageTotal)
+      convertStorage = Map.fromList . map toStoragePoint
+      storage node = StorageTable (convertStorage <$> Node.storageStats node)
+  in (CStats <$> fromIntegral . Node.fMem
+             <*> fromIntegral . Node.fDsk
+             <*> fromIntegral . Node.fSpindles
+             <*> amem
+             <*> fromIntegral . Node.availDisk
+             <*> fromIntegral . Node.availCpu
+             <*> amem
+             <*> fromIntegral . Node.availDisk
+             <*> fromIntegral . Node.availCpu
+             <*> idsk
+             <*> ispn
+             <*> fromIntegral . Node.uCpu
+             <*> imem
+             <*> Node.tMem
+             <*> Node.tDsk
+             <*> fromIntegral . Node.tSpindles
+             <*> Node.tCpu
+             <*> fromIntegral . Node.hiCpu
+             <*> ncpu
+             <*> fromIntegral . Node.xMem
+             <*> fromIntegral . Node.nMem
+             <*> const 0
+             <*> length . Node.pList
+             <*> storage) n
 
 -- | Compute the total free disk and memory in the cluster.
 totalResources :: Node.List -> CStats
 totalResources nl =
-  let cs = foldl' updateCStats emptyCStats . Container.elems $ nl
+  let cs = foldMap nodeToCstat nl
   in cs { csScore = compCV nl }
 
 -- | Compute the delta between two cluster state.

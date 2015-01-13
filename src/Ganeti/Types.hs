@@ -511,6 +511,7 @@ type SPExclusiveStorage = Bool
 
 -- | Storage units without storage-type-specific parameters
 data StorageUnitRaw = SURaw StorageType StorageKey
+  deriving (Ord, Show, Eq)
 
 -- | Full storage unit with storage-type-specific parameters
 data StorageUnit = SUFile StorageKey
@@ -523,7 +524,7 @@ data StorageUnit = SUFile StorageKey
                  | SURados StorageKey
                  | SUExt StorageKey
                  | SUDrbd StorageKey
-                 deriving (Eq)
+                 deriving (Eq, Ord)
 
 instance Show StorageUnit where
   show (SUFile key) = showSUSimple StorageFile key
