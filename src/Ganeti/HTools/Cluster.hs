@@ -388,7 +388,6 @@ computeAllocationDelta cini cfin =
 -- is a statistics for online nodes.
 detailedCVInfoExt :: [((Double, String), ([Double] -> Statistics, Bool))]
 detailedCVInfoExt = [ ((0.5,  "free_mem_cv"), (getStdDevStatistics, True))
-                    , ((0.5,  "free_disk_cv"), (getStdDevStatistics, True))
                     , ((1,  "n1_cnt"), (getSumStatistics, True))
                     , ((1,  "reserved_mem_cv"), (getStdDevStatistics, True))
                     , ((4,  "offline_all_cnt"), (getSumStatistics, False))
@@ -402,8 +401,6 @@ detailedCVInfoExt = [ ((0.5,  "free_mem_cv"), (getStdDevStatistics, True))
                     , ((2,  "pri_tags_score"), (getSumStatistics, True))
                     , ((0.5,  "spindles_cv"), (getStdDevStatistics, True))
                     , ((0.5,  "free_mem_cv_forth"), (getStdDevStatistics, True))
-                    , ( (0.5,  "free_disk_cv_forth")
-                      , (getStdDevStatistics, True))
                     , ( (0.5,  "vcpu_ratio_cv_forth")
                       , (getStdDevStatistics, True))
                     , ((0.5,  "spindles_cv_forth"), (getStdDevStatistics, True))
