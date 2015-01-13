@@ -124,6 +124,7 @@ import qualified Ganeti.HTools.PeerMap as P
 import Ganeti.BasicTypes
 import qualified Ganeti.HTools.Types as T
 import qualified Ganeti.Types as GT
+import qualified Ganeti.JSON as GJ
 
 -- * Type declarations
 
@@ -139,17 +140,20 @@ data StorageStats = StorageStats {
                           -- on this node.
   } deriving (Show, Eq)
 
+instance GJ.DictObject StorageStats where
+  toDict obj = [ ("sunit", J.showJSON $ storageUnit obj)
+               , ("free", J.showJSON $ storageFree obj)
+               , ("total", J.showJSON $ storageTotal obj)
+               ]
+  fromDictWKeys js =
+    StorageStats
+          <$> GJ.fromObj js "sunit"
+          <*> GJ.fromObj js "free"
+          <*> GJ.fromObj js "total"
+
 instance J.JSON StorageStats where
-  readJSON (J.JSArray [type_, key, params]) =
-    StorageStats 
-          <$> J.readJSON type_
-          <*> J.readJSON key
-          <*> J.readJSON params
-  readJSON s = fail $ "Invalid storage: '" ++ J.encode s ++ "'"
-  showJSON storage = J.showJSON [ J.showJSON $ storageUnit storage
-                                , J.showJSON $ storageFree storage
-                                , J.showJSON $ storageTotal storage
-                                ]
+  showJSON = GJ.showJSONtoDict
+  readJSON = GJ.readJSONfromDict
 
 -- | The node type.
 data Node = Node
