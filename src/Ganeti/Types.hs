@@ -92,6 +92,7 @@ module Ganeti.Types
   , oobStatusToRaw
   , StorageType(..)
   , storageTypeToRaw
+  , storageTypeFromRaw
   , EvacMode(..)
   , evacModeToRaw
   , FileDriver(..)

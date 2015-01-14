@@ -56,6 +56,7 @@ module Ganeti.HTools.Backend.Text
   , serializeCluster
   ) where
 
+import Control.Applicative
 import Control.Monad
 import Data.List
 
@@ -69,6 +70,7 @@ import qualified Ganeti.HTools.Container as Container
 import qualified Ganeti.HTools.Group as Group
 import qualified Ganeti.HTools.Node as Node
 import qualified Ganeti.HTools.Instance as Instance
+import Ganeti.Types (StorageUnitRaw(..), addParamsToStorageUnit, storageTypeFromRaw)
 
 -- * Helper functions
 
@@ -279,11 +281,30 @@ loadNode ktg [name, tm, nm, fm, td, fd, tc, fo, gu, spindles, tags,
                 excl_stor, free_spindles, nos_cpu, cpu_speed, ""]
 
 loadNode ktg s
-  | length s > 15 = loadNode ktg $ take 15 s
+  | length s > 16 = loadNode ktg $ take 16 s
   | otherwise = fail $ "Invalid/incomplete node data: '" ++ show s ++ "'"
 
 loadStorage :: String -> Maybe [Node.StorageStats]
-loadStorage = undefined
+loadStorage s = do
+  let table = fmap (sepSplit ',') $ sepSplit ';' s
+      loadNodeStats = mapM loadStorageUnit
+      mkStorageUnit type_ key [] = addParamsToStorageUnit False
+                                      <$> (SURaw <$> storageTypeFromRaw type_
+                                                 <*> pure key)
+      mkStorageUnit type_ key (p:_) = addParamsToStorageUnit 
+                                      <$> tryRead "exclusive" p
+                                      <*> (SURaw <$> storageTypeFromRaw type_
+                                                 <*> pure key)
+      mkStorageStats :: String -> String -> String -> String -> [String] -> Maybe Node.StorageStats
+      mkStorageStats free total type_ key rest =
+        Node.StorageStats <$> mkStorageUnit type_ key rest
+                          <*> tryRead "free" free
+                          <*> tryRead "total" total
+      loadStorageUnit items
+          | length items < 4 = fail "Too few items"
+          | otherwise = mkStorageStats (items !! 0) (items !! 1)
+                                       (items !! 2) (items !! 3) (drop 4 items)
+  loadNodeStats table
 
 -- | Load an instance from a field list.
 loadInst :: NameAssoc -- ^ Association list with the current nodes
