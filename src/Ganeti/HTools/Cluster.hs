@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 {-| Implementation of cluster-wide logic.
 
 This module holds all pure cluster-logic; I\/O related functionality
@@ -72,7 +73,6 @@ module Ganeti.HTools.Cluster
   , tryBalance
   , compCV
   , compCVNodes
-  , compDetailedCV
   , printStats
   , iMoveToJob
   -- * IAllocator functions
@@ -94,7 +94,7 @@ module Ganeti.HTools.Cluster
   ) where
 
 import Control.Applicative ((<$>),(<*>), liftA2)
-import Control.Arrow ((&&&))
+import Control.Arrow ((&&&),(***))
 import Control.Monad (unless)
 import Data.Foldable (foldMap)
 import Data.Function (on)
@@ -305,6 +305,13 @@ instanceNodes nl inst =
       old_s = Container.find old_sdx nl
   in (old_pdx, old_sdx, old_p, old_s)
 
+getStorage :: Node.Node -> StorageTable
+getStorage node =
+  let toStoragePoint = Node.storageUnit &&& (Sum . Node.storageFree &&&
+                                             Sum . Node.storageTotal)
+      convertStorage = Map.fromList . map toStoragePoint
+  in StorageTable (convertStorage <$> Node.storageStats node)
+
 nodeToCstat :: Node.Node -> CStats
 nodeToCstat n =
   let amem node = fromIntegral $ max 0 $ Node.fMem node - Node.rMem node
@@ -314,10 +321,6 @@ nodeToCstat n =
                   iPolicyVcpuRatio (Node.iPolicy node)
       imem node = fromIntegral $ truncate (Node.tMem node) - Node.nMem node
                                  - Node.xMem node - Node.fMem node
-      toStoragePoint = Node.storageUnit &&& (Sum . Node.storageFree &&&
-                                             Sum . Node.storageTotal)
-      convertStorage = Map.fromList . map toStoragePoint
-      storage node = StorageTable (convertStorage <$> Node.storageStats node)
   in (CStats <$> fromIntegral . Node.fMem
              <*> fromIntegral . Node.fDsk
              <*> fromIntegral . Node.fSpindles
@@ -341,7 +344,7 @@ nodeToCstat n =
              <*> fromIntegral . Node.nMem
              <*> const 0
              <*> length . Node.pList
-             <*> storage) n
+             <*> getStorage) n
 
 -- | Compute the total free disk and memory in the cluster.
 totalResources :: Node.List -> CStats
@@ -394,8 +397,8 @@ n1FailureMetric node =
 
 offlineAllMetric :: NodeBasedMetric
 offlineAllMetric node =
-  fromIntegral . length $ Node.pList node +
-  fromIntegral . length $ Node.sList node
+  (fromIntegral . length $ Node.pList node) +
+  (fromIntegral . length $ Node.sList node)
 
 offlinePriMetric :: NodeBasedMetric
 offlinePriMetric node = fromIntegral . length $ Node.pList node
@@ -434,131 +437,127 @@ conflictingPrimariesMetric :: NodeBasedMetric
 conflictingPrimariesMetric node = fromIntegral $ Node.conflictingPrimaries node
 
 storageUnitsFree :: [Node.Node] -> [Double]
-storageUnitsFree nodes = undefined
+storageUnitsFree ns =
+  let sus = foldMap getStorage ns
+  in undefined
 
--- | The names and weights of the individual elements in the CV list, together
--- with their statistical accumulation function and a bit to decide whether it
--- is a statistics for online nodes.
-detailedCVInfoExt :: [((Double, String), ([Node.Node] -> Statistics, Bool))]
-detailedCVInfoExt =
-  [ ((0.5,  "free_mem_cv"), (getStdDevStatistics . fmap Node.pMem, True))
-  , ((1,  "n1_cnt"), (getSumStatistics . fmap n1FailureMetric, True))
-  , ((1,  "reserved_mem_cv"), (getStdDevStatistics . fmap Node.pRem, True))
-  , ((4,  "offline_all_cnt"), (getSumStatistics . fmap offlineAllMetric, False))
-  , ((16, "offline_pri_cnt"), (getSumStatistics . fmap offlinePriMetric, False))
-  , ( (0.5,  "vcpu_ratio_cv")
-      , (getStdDevStatistics . fmap Node.pCpuEff, True))
-  , ((1,  "cpu_load_cv"), (getStdDevStatistics . fmap cpuLoadMetric, True))
-  , ((1,  "mem_load_cv"), (getStdDevStatistics . fmap memLoadMetric, True))
-  , ((1,  "disk_load_cv"), (getStdDevStatistics . fmap diskLoadMetric, True))
-  , ((1,  "net_load_cv"), (getStdDevStatistics . fmap netLoadMetric, True))
-  , ((2,  "pri_tags_score")
-     , (getSumStatistics . fmap conflictingPrimariesMetric, True))
-  , ((0.5,  "spindles_cv")
-     , (getStdDevStatistics . fmap spindlesMetric, True))
-  , ((0.5,  "free_mem_cv_forth")
-     , (getStdDevStatistics . fmap Node.pMemForth, True))
-  , ( (0.5,  "vcpu_ratio_cv_forth")
-      , (getStdDevStatistics . fmap Node.pCpuEffForth, True))
-  , ((0.5,  "spindles_cv_forth")
-     , (getStdDevStatistics . spindlesMetricForth, True))
-  , ((1,  "free_storage"), (getStdDevStatistics . storageUnitsFree, True))
-  ]
+data ClusterStat = ClusterStat
+  { csFreeMem :: StdDevStatistics
+  , csN1Count :: SumStatistics
+  , csReservedMem :: StdDevStatistics
+  , csOfflineAll :: SumStatistics
+  , csOfflinePrimary :: SumStatistics
+  , csVcpuRatio :: StdDevStatistics
+  , csCpuLoad :: StdDevStatistics
+  , csMemLoad :: StdDevStatistics
+  , csDiskLoad :: StdDevStatistics
+  , csNetLoad :: StdDevStatistics
+  , csPrimaryTagScore :: SumStatistics
+  , csSpindles :: StdDevStatistics
+  , csFreeMemForth :: StdDevStatistics
+  , csVcpuRatioForth :: StdDevStatistics
+  , csSpindlesForth :: StdDevStatistics
+  , csFreeStorage :: StdDevStatistics
+  } deriving (Show, Eq)
 
--- | The names and weights of the individual elements in the CV list.
-detailedCVInfo :: [(Double, String)]
-detailedCVInfo = map fst detailedCVInfoExt
+aggregateCs :: ClusterStat -> Double
+aggregateCs cs = 
+  let eval f = getStatisticValue $ f cs
+  in    0.5 * eval csFreeMem
+      + 1 *   eval csN1Count
+      + 1 *   eval csReservedMem
+      + 4 *   eval csOfflineAll
+      + 16 *  eval csOfflinePrimary
+      + 0.5 * eval csVcpuRatio
+      + 1 *   eval csCpuLoad
+      + 1 *   eval csMemLoad
+      + 1 *   eval csDiskLoad
+      + 1 *   eval csNetLoad
+      + 2 *   eval csPrimaryTagScore
+      + 0.5 * eval csSpindles
+      + 0.5 * eval csFreeMemForth
+      + 0.5 * eval csVcpuRatioForth
+      + 0.5 * eval csSpindlesForth
+      + 1 *   eval csFreeStorage
 
--- | Holds the weights used by 'compCVNodes' for each metric.
-detailedCVWeights :: [Double]
-detailedCVWeights = map fst detailedCVInfo
+instance Monoid ClusterStat where
+  mempty = ClusterStat mempty mempty mempty mempty mempty mempty mempty mempty
+                       mempty mempty mempty mempty mempty mempty mempty mempty
+  mappend a b = ClusterStat ((mappend `on` csFreeMem) a b)
+                            ((mappend `on` csN1Count) a b)
+                            ((mappend `on` csReservedMem) a b)
+                            ((mappend `on` csOfflineAll) a b)
+                            ((mappend `on` csOfflinePrimary) a b)
+                            ((mappend `on` csVcpuRatio) a b)
+                            ((mappend `on` csCpuLoad) a b)
+                            ((mappend `on` csMemLoad) a b)
+                            ((mappend `on` csDiskLoad) a b)
+                            ((mappend `on` csNetLoad) a b)
+                            ((mappend `on` csPrimaryTagScore) a b)
+                            ((mappend `on` csSpindles) a b)
+                            ((mappend `on` csFreeMemForth) a b)
+                            ((mappend `on` csVcpuRatioForth) a b)
+                            ((mappend `on` csSpindlesForth) a b)
+                            ((mappend `on` csFreeStorage) a b)
 
--- | The aggregation functions for the weights
-detailedCVAggregation :: [([Double] -> Statistics, Bool)]
-detailedCVAggregation = map snd detailedCVInfoExt
-
--- | The bit vector describing which parts of the statistics are
--- for online nodes.
-detailedCVOnlineStatus :: [Bool]
-detailedCVOnlineStatus = map snd detailedCVAggregation
-
--- | Compute statistical measures of a single node.
-compDetailedCVNode :: Node.Node -> [Double]
-compDetailedCVNode node =
-  let mem = Node.pMem node
-      memF = Node.pMemForth node
-      n1 = fromIntegral
-           $ if Node.failN1 node
-               then length (Node.sList node) + length (Node.pList node)
-               else 0
-      res = Node.pRem node
-      ipri = fromIntegral . length $ Node.pList node
-      isec = fromIntegral . length $ Node.sList node
-      ioff = ipri + isec
-      cpu = Node.pCpuEff node
-      cpuF = Node.pCpuEffForth node
-      DynUtil c1 m1 d1 nn1 = Node.utilLoad node
-      DynUtil c2 m2 d2 nn2 = Node.utilPool node
-      (c_load, m_load, d_load, n_load) = (c1/c2, m1/m2, d1/d2, nn1/nn2)
-      pri_tags = fromIntegral $ Node.conflictingPrimaries node
-      spindles = Node.instSpindles node / Node.hiSpindles node
-      spindlesF = Node.instSpindlesForth node / Node.hiSpindles node
-      storage = undefined
-  in [ mem, n1, res, ioff, ipri, cpu
-     , c_load, m_load, d_load, n_load
-     , pri_tags, spindles
-     , memF, cpuF, spindlesF, storage
-     ]
-
--- | Compute the statistics of a cluster.
-compClusterStatistics :: [Node.Node] -> [Statistics]
-compClusterStatistics all_nodes =
-  let (offline, nodes) = partition Node.offline all_nodes
-      offline_values = transpose (map compDetailedCVNode offline)
-                       ++ repeat []
-      -- transpose of an empty list is empty and not k times the empty list, as
-      -- would be the transpose of a 0 x k matrix
-      online_values = transpose $ map compDetailedCVNode nodes
-      aggregate (f, True) (onNodes, _) = f onNodes
-      aggregate (f, False) (_, offNodes) = f offNodes
-  in zipWith aggregate detailedCVAggregation
-       $ zip online_values offline_values
+instance Statistics [Node.Node] ClusterStat where
+  getStatisticValue = aggregateCs
+  singleton ns =
+    let (offline, nodes) = partition Node.offline ns
+        avg l = sum l / (fromIntegral $ length l)
+    in ClusterStat { csFreeMem = mconcat $ fmap (singleton . Node.pMem) nodes
+                   , csN1Count = mconcat $ fmap (singleton . n1FailureMetric) nodes
+                   , csReservedMem = mconcat $ fmap (singleton . Node.pRem) nodes
+                   , csOfflineAll = mconcat $ fmap (singleton . offlineAllMetric) offline
+                   , csOfflinePrimary = mconcat $ fmap (singleton . offlinePriMetric) offline
+                   , csVcpuRatio = mconcat $ fmap (singleton . Node.pCpuEff) nodes
+                   , csCpuLoad = mconcat $ fmap (singleton . cpuLoadMetric) nodes
+                   , csMemLoad = mconcat $ fmap (singleton . memLoadMetric) nodes
+                   , csDiskLoad = mconcat $ fmap (singleton . diskLoadMetric) nodes
+                   , csNetLoad = mconcat $ fmap (singleton . netLoadMetric) nodes
+                   , csPrimaryTagScore = mconcat $ fmap (singleton . conflictingPrimariesMetric) nodes
+                   , csSpindles = mconcat $ fmap (singleton . spindlesMetric) nodes
+                   , csFreeMemForth = mconcat $ fmap (singleton . Node.pMemForth) nodes
+                   , csVcpuRatioForth = mconcat $ fmap (singleton . Node.pCpuEffForth) nodes
+                   , csSpindlesForth = mconcat $ fmap (singleton . spindlesMetricForth) nodes
+                   , csFreeStorage = singleton . avg $ storageUnitsFree nodes
+                   }
+  a <-> b = ClusterStat (((<->) `on` csFreeMem) a b)
+                        (((<->) `on` csN1Count) a b)
+                        (((<->) `on` csReservedMem) a b)
+                        (((<->) `on` csOfflineAll) a b)
+                        (((<->) `on` csOfflinePrimary) a b)
+                        (((<->) `on` csVcpuRatio) a b)
+                        (((<->) `on` csCpuLoad) a b)
+                        (((<->) `on` csMemLoad) a b)
+                        (((<->) `on` csDiskLoad) a b)
+                        (((<->) `on` csNetLoad) a b)
+                        (((<->) `on` csPrimaryTagScore) a b)
+                        (((<->) `on` csSpindles) a b)
+                        (((<->) `on` csFreeMemForth) a b)
+                        (((<->) `on` csVcpuRatioForth) a b)
+                        (((<->) `on` csSpindlesForth) a b)
+                        (((<->) `on` csFreeStorage) a b)
 
 -- | Update a cluster statistics by replacing the contribution of one
 -- node by that of another.
-updateClusterStatistics :: [Statistics]
-                           -> (Node.Node, Node.Node) -> [Statistics]
-updateClusterStatistics stats (old, new) =
-  let update = zip (compDetailedCVNode old) (compDetailedCVNode new)
-      online = not $ Node.offline old
-      updateStat forOnline stat upd = if forOnline == online
-                                        then updateStatistics stat upd
-                                        else stat
-  in zipWith3 updateStat detailedCVOnlineStatus stats update
+updateClusterStatistics :: ClusterStat
+                           -> [(Node.Node, Node.Node)] -> ClusterStat
+updateClusterStatistics stats updates =
+  let (old, new) = (singleton *** singleton) $ unzip updates
+  in stats <-> old <> new
 
 -- | Update a cluster statistics twice.
-updateClusterStatisticsTwice :: [Statistics]
+updateClusterStatisticsTwice :: ClusterStat
                                 -> (Node.Node, Node.Node)
                                 -> (Node.Node, Node.Node)
-                                -> [Statistics]
-updateClusterStatisticsTwice s a =
-  updateClusterStatistics (updateClusterStatistics s a)
-
--- | Compute cluster statistics
-compDetailedCV :: [Node.Node] -> [Double]
-compDetailedCV = map getStatisticValue . compClusterStatistics
-
--- | Compute the cluster score from its statistics
-compCVfromStats :: [Statistics] -> Double
-compCVfromStats = sum . zipWith (*) detailedCVWeights . map getStatisticValue
-
--- | Compute the /total/ variance.
-compCVNodes :: [Node.Node] -> Double
-compCVNodes = sum . zipWith (*) detailedCVWeights . compDetailedCV
+                                -> ClusterStat
+updateClusterStatisticsTwice s a b =
+  updateClusterStatistics s [a, b]
 
 -- | Wrapper over 'compCVNodes' for callers that have a 'Node.List'.
 compCV :: Node.List -> Double
-compCV = compCVNodes . Container.elems
+compCV x = getStatisticValue (singleton $ Container.elems x :: ClusterStat)
 
 -- | Compute online nodes from a 'Node.List'.
 getOnline :: Node.List -> [Node.Node]
@@ -689,7 +688,7 @@ allocateOnSingle opts nl inst new_pdx =
 
 -- | Tries to allocate an instance on a given pair of nodes.
 allocateOnPair :: AlgorithmOptions
-               -> [Statistics]
+               -> ClusterStat
                -> Node.List -> Instance.Instance -> Ndx -> Ndx
                -> OpResult Node.AllocElement
 allocateOnPair opts stats nl inst new_pdx new_sdx =
@@ -705,7 +704,7 @@ allocateOnPair opts stats nl inst new_pdx new_sdx =
         new_nl = Container.addTwo new_pdx new_p new_sdx new_s nl
         new_stats = updateClusterStatisticsTwice stats
                       (tgt_p, new_p) (tgt_s, new_s)
-    return (new_nl, new_inst, [new_p, new_s], compCVfromStats new_stats)
+    return (new_nl, new_inst, [new_p, new_s], getStatisticValue new_stats)
 
 -- | Tries to perform an instance move and returns the best table
 -- between the original one and the new one.
@@ -978,7 +977,7 @@ tryAlloc :: (Monad m) =>
          -> m AllocSolution   -- ^ Possible solution list
 tryAlloc _ _  _ _    (Right []) = fail "Not enough online nodes"
 tryAlloc opts nl _ inst (Right ok_pairs) =
-  let cstat = compClusterStatistics $ Container.elems nl
+  let cstat = singleton $ Container.elems nl
       psols = parMap rwhnf (\(p, ss) ->
                               foldl' (\cstate ->
                                         concatAllocs cstate .
@@ -1323,6 +1322,9 @@ evacOneNodeOnly opts nl il inst gdx avail_nodes = do
       il' = Container.add idx inst' il
       ops = iMoveToJob nl' il' idx (op_fn ndx)
   return (nl', il', ops)
+
+compCVNodes :: [Node.Node] -> Double
+compCVNodes x = getStatisticValue (singleton x :: ClusterStat)
 
 -- | Inner fold function for changing one node of an instance.
 --
@@ -1775,17 +1777,10 @@ printInsts nl il =
 
 -- | Shows statistics for a given node list.
 printStats :: String -> Node.List -> String
-printStats lp nl =
-  let dcvs = compDetailedCV $ Container.elems nl
-      (weights, names) = unzip detailedCVInfo
-      hd = zip3 (weights ++ repeat 1) (names ++ repeat "unknown") dcvs
-      header = [ "Field", "Value", "Weight" ]
-      formatted = map (\(w, h, val) ->
-                         [ h
-                         , printf "%.8f" val
-                         , printf "x%.2f" w
-                         ]) hd
-  in printTable lp header formatted $ False:repeat True
+printStats _ nl =
+  let dcvs = singleton $ Container.elems nl :: ClusterStat
+  in show dcvs
+-- TODO: table
 
 -- | Convert a placement into a list of OpCodes (basically a job).
 iMoveToJob :: Node.List        -- ^ The node list; only used for node

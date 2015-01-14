@@ -36,6 +36,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module Test.Ganeti.Utils.Statistics (testUtils_Statistics) where
 
+import Data.Monoid ((<>))
+
 import Test.QuickCheck (Property, forAll, choose, vectorOf)
 
 import Test.Ganeti.TestCommon
@@ -55,7 +57,7 @@ prop_stddev_update =
   let original = xs ++ [a] ++ ys
       modified = xs ++ [b] ++ ys
       with_update = getStatisticValue
-                    $ updateStatistics (getStdDevStatistics original) (a,b)
+                    $ (getStdDevStatistics original) <-> singleton a <> singleton b
       direct = stdDev modified
   in counterexample ("Value computed by update " ++ show with_update
                      ++ " differs too much from correct value " ++ show direct)

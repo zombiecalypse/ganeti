@@ -1,4 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving, MultiParamTypeClasses,
+    FunctionalDependencies #-}
 
 
 {-| Utility functions for statistical accumulation. -}
@@ -34,29 +35,79 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -}
 
 module Ganeti.Utils.Statistics
-  ( Statistics
+  ( SumStatistics(..)
+  , StdDevStatistics(..)
   , getSumStatistics
   , getStdDevStatistics
-  , getStatisticValue
-  , updateStatistics
+  , Statistics(..)
   ) where
 
 import Data.List (foldl')
+import Data.Monoid
 
--- | Abstract type of statistical accumulations. They behave as if the given
+square :: Double -> Double
+square x = x * x
+
+-- | Abstract class of statistical accumulations. They behave as if the given
 -- statistics were computed on the list of values, but they allow a potentially
 -- more efficient update of a given value.
-data Statistics = SumStatistics Double
-                | StdDevStatistics Double Double Double deriving Show
+--
+-- The statistic is a single floating point value. It aggregates over the type
+-- b.
+class Monoid a => Statistics b a | a -> b where
+  getStatisticValue :: a -> Double
+  (<->) :: a -> a -> a -- ^ "substraction", such that a <> b <-> b = a
+                       -- and  a <> b <-> a = b
+  singleton :: b -> a
+
+newtype SumStatistics = SumStatistics Double
+  deriving (Show, Num, Eq)
+
+data StdDevStatistics = StdDevStatistics Double Double Double
                   -- count, sum, and not the sum of squares---instead the
                   -- computed variance for better precission.
+  deriving (Show, Eq)
+
+instance Monoid SumStatistics where
+  mempty = SumStatistics 0
+  mappend = (+)
+
+instance Statistics Double SumStatistics where
+  getStatisticValue (SumStatistics a) = a
+  (<->) = (-)
+  singleton = SumStatistics
+
+instance Monoid StdDevStatistics where
+  mempty = StdDevStatistics 0 0 0
+  mappend !left !right =
+    let StdDevStatistics n1 sum1 sumsq1 = left
+        StdDevStatistics n2 sum2 sumsq2 = right
+        nom = square (sum1 * n2 - sum2 * n1)
+        sumsq = if n1 == 0 || n2 == 0
+                then sumsq1 + sumsq2
+                else sumsq1 + sumsq2 + nom/((n1 + n2) * n1 * n2)
+    in StdDevStatistics (n1+n2) (sum1+sum2) sumsq
+
+instance Statistics Double StdDevStatistics where
+  getStatisticValue (StdDevStatistics n _ sumsq) = sqrt (sumsq / n)
+  left <-> right =
+    let StdDevStatistics nab sumab sumsqab = left
+        StdDevStatistics nb sumb sumsqb = right
+        na = nab - nb
+        suma = sumab - sumb
+        sumsqa = sumsqab - sumsqb - (square $ suma*nb - sumb * na)/(na*nb*(na+nb))
+        cut0 x
+          | x < 0 = 0
+          | otherwise = x
+    in StdDevStatistics (cut0 na) (cut0 suma) (cut0 sumsqa)
+  singleton f = StdDevStatistics 1 f 0
 
 -- | Get a statistics that sums up the values.
-getSumStatistics :: [Double] -> Statistics
+getSumStatistics :: [Double] -> SumStatistics
 getSumStatistics = SumStatistics . sum
 
 -- | Get a statistics for the standard deviation.
-getStdDevStatistics :: [Double] -> Statistics
+getStdDevStatistics :: [Double] -> StdDevStatistics
 getStdDevStatistics xs =
   let (nt, st) = foldl' (\(n, s) x ->
                             let !n' = n + 1
@@ -66,22 +117,3 @@ getStdDevStatistics xs =
       mean = st / nt
       nvar = foldl' (\v x -> let d = x - mean in v + d * d) 0 xs
   in StdDevStatistics nt st (nvar / nt)
-
--- | Obtain the value of a statistics.
-getStatisticValue :: Statistics -> Double
-getStatisticValue (SumStatistics s) = s
-getStatisticValue (StdDevStatistics _ _ var) = sqrt var
-
--- | In a given statistics replace on value by another. This
--- will only give meaningful results, if the original value
--- was actually part of the statistics.
-updateStatistics :: Statistics -> (Double, Double) -> Statistics
-updateStatistics (SumStatistics s) (x, y) = SumStatistics $ s +  (y - x)
-updateStatistics (StdDevStatistics n s var) (x, y) =
-  let !ds = y - x
-      !dss = y * y - x * x
-      !dnnvar = n * dss - (2 * s + ds) * ds
-      !s' = s + ds
-      !var' = max 0 $ var + dnnvar / (n * n)
-  in StdDevStatistics n s' var'
-
