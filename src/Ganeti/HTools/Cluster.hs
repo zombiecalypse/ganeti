@@ -383,29 +383,87 @@ computeAllocationDelta cini cfin =
                        }
   in (rini, rfin, runa)
 
+
+type NodeBasedMetric = Node.Node -> Double
+
+n1FailureMetric :: NodeBasedMetric
+n1FailureMetric node =
+  fromIntegral $ if Node.failN1 node
+                   then length (Node.sList node) + length (Node.pList node)
+                   else 0
+
+offlineAllMetric :: NodeBasedMetric
+offlineAllMetric node =
+  fromIntegral . length $ Node.pList node +
+  fromIntegral . length $ Node.sList node
+
+offlinePriMetric :: NodeBasedMetric
+offlinePriMetric node = fromIntegral . length $ Node.pList node
+
+cpuLoadMetric :: NodeBasedMetric
+cpuLoadMetric node =
+  let DynUtil c1 _ _ _ = Node.utilLoad node
+      DynUtil c2 _ _ _ = Node.utilPool node
+  in c1/c2
+
+memLoadMetric :: NodeBasedMetric
+memLoadMetric node =
+  let DynUtil _ m1 _ _ = Node.utilLoad node
+      DynUtil _ m2 _ _ = Node.utilPool node
+  in m1/m2
+
+diskLoadMetric :: NodeBasedMetric
+diskLoadMetric node =
+  let DynUtil _ _ d1 _ = Node.utilLoad node
+      DynUtil _ _ d2 _ = Node.utilPool node
+  in d1/d2
+
+netLoadMetric :: NodeBasedMetric
+netLoadMetric node =
+  let DynUtil _ _ _ nn1 = Node.utilLoad node
+      DynUtil _ _ _ nn2 = Node.utilPool node
+  in nn1/nn2
+
+spindlesMetric :: NodeBasedMetric
+spindlesMetric = (/) <$> Node.instSpindles <*> Node.hiSpindles
+
+spindlesMetricForth :: NodeBasedMetric
+spindlesMetricForth = (/) <$> Node.instSpindlesForth <*> Node.hiSpindles
+
+conflictingPrimariesMetric :: NodeBasedMetric
+conflictingPrimariesMetric node = fromIntegral $ Node.conflictingPrimaries node
+
+storageUnitsFree :: [Node.Node] -> [Double]
+storageUnitsFree nodes = undefined
+
 -- | The names and weights of the individual elements in the CV list, together
 -- with their statistical accumulation function and a bit to decide whether it
 -- is a statistics for online nodes.
-detailedCVInfoExt :: [((Double, String), ([Double] -> Statistics, Bool))]
-detailedCVInfoExt = [ ((0.5,  "free_mem_cv"), (getStdDevStatistics, True))
-                    , ((1,  "n1_cnt"), (getSumStatistics, True))
-                    , ((1,  "reserved_mem_cv"), (getStdDevStatistics, True))
-                    , ((4,  "offline_all_cnt"), (getSumStatistics, False))
-                    , ((16, "offline_pri_cnt"), (getSumStatistics, False))
-                    , ( (0.5,  "vcpu_ratio_cv")
-                      , (getStdDevStatistics, True))
-                    , ((1,  "cpu_load_cv"), (getStdDevStatistics, True))
-                    , ((1,  "mem_load_cv"), (getStdDevStatistics, True))
-                    , ((1,  "disk_load_cv"), (getStdDevStatistics, True))
-                    , ((1,  "net_load_cv"), (getStdDevStatistics, True))
-                    , ((2,  "pri_tags_score"), (getSumStatistics, True))
-                    , ((0.5,  "spindles_cv"), (getStdDevStatistics, True))
-                    , ((0.5,  "free_mem_cv_forth"), (getStdDevStatistics, True))
-                    , ( (0.5,  "vcpu_ratio_cv_forth")
-                      , (getStdDevStatistics, True))
-                    , ((0.5,  "spindles_cv_forth"), (getStdDevStatistics, True))
-                    , ((1,  "free_storage"), (getStdDevStatistics, True))
-                    ]
+detailedCVInfoExt :: [((Double, String), ([Node.Node] -> Statistics, Bool))]
+detailedCVInfoExt =
+  [ ((0.5,  "free_mem_cv"), (getStdDevStatistics . fmap Node.pMem, True))
+  , ((1,  "n1_cnt"), (getSumStatistics . fmap n1FailureMetric, True))
+  , ((1,  "reserved_mem_cv"), (getStdDevStatistics . fmap Node.pRem, True))
+  , ((4,  "offline_all_cnt"), (getSumStatistics . fmap offlineAllMetric, False))
+  , ((16, "offline_pri_cnt"), (getSumStatistics . fmap offlinePriMetric, False))
+  , ( (0.5,  "vcpu_ratio_cv")
+      , (getStdDevStatistics . fmap Node.pCpuEff, True))
+  , ((1,  "cpu_load_cv"), (getStdDevStatistics . fmap cpuLoadMetric, True))
+  , ((1,  "mem_load_cv"), (getStdDevStatistics . fmap memLoadMetric, True))
+  , ((1,  "disk_load_cv"), (getStdDevStatistics . fmap diskLoadMetric, True))
+  , ((1,  "net_load_cv"), (getStdDevStatistics . fmap netLoadMetric, True))
+  , ((2,  "pri_tags_score")
+     , (getSumStatistics . fmap conflictingPrimariesMetric, True))
+  , ((0.5,  "spindles_cv")
+     , (getStdDevStatistics . fmap spindlesMetric, True))
+  , ((0.5,  "free_mem_cv_forth")
+     , (getStdDevStatistics . fmap Node.pMemForth, True))
+  , ( (0.5,  "vcpu_ratio_cv_forth")
+      , (getStdDevStatistics . fmap Node.pCpuEffForth, True))
+  , ((0.5,  "spindles_cv_forth")
+     , (getStdDevStatistics . spindlesMetricForth, True))
+  , ((1,  "free_storage"), (getStdDevStatistics . storageUnitsFree, True))
+  ]
 
 -- | The names and weights of the individual elements in the CV list.
 detailedCVInfo :: [(Double, String)]
