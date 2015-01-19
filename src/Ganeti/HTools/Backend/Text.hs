@@ -287,6 +287,8 @@ loadNode ktg s
 loadStorage :: String -> Maybe [Node.StorageStats]
 loadStorage s = do
   let table = fmap (sepSplit ',') $ sepSplit ';' s
+      ifGiven (Just []) = Nothing
+      ifGiven a = a
       loadNodeStats = mapM loadStorageUnit
       mkStorageUnit type_ key [] = addParamsToStorageUnit False
                                       <$> (SURaw <$> storageTypeFromRaw type_
@@ -304,7 +306,7 @@ loadStorage s = do
           | length items < 4 = fail "Too few items"
           | otherwise = mkStorageStats (items !! 0) (items !! 1)
                                        (items !! 2) (items !! 3) (drop 4 items)
-  loadNodeStats table
+  ifGiven $ loadNodeStats table
 
 -- | Load an instance from a field list.
 loadInst :: NameAssoc -- ^ Association list with the current nodes

@@ -185,7 +185,7 @@ data Table = Table {
   } deriving (Show)
 
 newtype StorageTable = StorageTable (Maybe (Map.Map GT.StorageUnit
-                                                    (Sum Integer, Sum Integer)))
+                                                    [(Integer, Integer)]))
   deriving (Show, Eq)
 
 instance Monoid StorageTable where
@@ -193,7 +193,7 @@ instance Monoid StorageTable where
   mappend (StorageTable Nothing) a = a
   mappend a (StorageTable Nothing) = a
   mappend (StorageTable (Just left)) (StorageTable (Just right)) =
-    let joined = Map.unionWith mappend left right
+    let joined = Map.unionWith (++) left right
     in StorageTable $ Just joined
 
 -- | Cluster statistics data type.
@@ -307,8 +307,8 @@ instanceNodes nl inst =
 
 getStorage :: Node.Node -> StorageTable
 getStorage node =
-  let toStoragePoint = Node.storageUnit &&& (Sum . Node.storageFree &&&
-                                             Sum . Node.storageTotal)
+  let toStoragePoint = Node.storageUnit &&& ((:[]) . (Node.storageFree &&&
+                                             Node.storageTotal))
       convertStorage = Map.fromList . map toStoragePoint
   in StorageTable (convertStorage <$> Node.storageStats node)
 
@@ -438,8 +438,11 @@ conflictingPrimariesMetric node = fromIntegral $ Node.conflictingPrimaries node
 
 storageUnitsFree :: [Node.Node] -> [Double]
 storageUnitsFree ns =
-  let sus = foldMap getStorage ns
-  in undefined
+  let (StorageTable sus) = foldMap getStorage ns
+      percFree (free, total) = fromIntegral free / fromIntegral total
+      allStorageUnits :: Map.Map a [(Integer, Integer)] -> Map.Map a Double
+      allStorageUnits = fmap (getStatisticValue . getStdDevStatistics . fmap percFree)
+  in fromMaybe [] $ fmap (Map.elems . allStorageUnits) sus
 
 data ClusterStat = ClusterStat
   { csFreeMem :: StdDevStatistics
