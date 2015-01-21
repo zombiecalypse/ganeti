@@ -94,7 +94,8 @@ from ganeti.constants import (QFT_UNKNOWN, QFT_TEXT, QFT_BOOL, QFT_NUMBER,
  NQ_INST,
  NQ_LIVE,
  NQ_GROUP,
- NQ_OOB) = range(1, 6)
+ NQ_OOB,
+ NQ_STORAGE) = range(1, 7)
 
 (IQ_CONFIG,
  IQ_LIVE,
@@ -1188,6 +1189,8 @@ _NODE_LIVE_FIELDS = {
             "Amount of memory used by node (dom0 for Xen)"),
   "mtotal": ("MTotal", QFT_UNIT, "memory_total",
              "Total amount of memory of physical machine"),
+  "storage": ("Storage", QFT_OTHER, "storage",
+              "Storage information about this node"),
   }
 
 
@@ -1297,6 +1300,8 @@ def _GetStatsField(field, kind, data):
 
   if kind == QFT_TEXT:
     return value
+  elif kind == QFT_OTHER:
+    return dict(value)
 
   assert kind in (QFT_NUMBER, QFT_UNIT)
 
