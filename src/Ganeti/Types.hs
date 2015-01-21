@@ -497,6 +497,7 @@ $(THH.declareLADT ''String "StorageType"
   , ("StorageBlock", "blockdev")
   , ("StorageRados", "rados")
   , ("StorageExt", "ext")
+  , ("StorageDrbd", "drbd")
   ])
 $(THH.makeJSONInstance ''StorageType)
 
