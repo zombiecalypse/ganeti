@@ -97,6 +97,7 @@ N_FIELDS = ["name", "offline", "master_candidate", "drained",
             "pip", "sip", "role",
             "pinst_list", "sinst_list",
             "master_capable", "vm_capable",
+            "storage",
             "ndparams",
             "group.uuid",
             ] + _COMMON_FIELDS
