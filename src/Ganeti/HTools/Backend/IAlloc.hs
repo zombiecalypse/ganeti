@@ -162,8 +162,9 @@ parseNode ktg n a = do
   dfree  <- lvextract 0 "free_disk"
   ctotal <- lvextract 0.0 "total_cpus"
   cnos <- lvextract 0 "reserved_cpus"
+  storage <- lvextract Nothing "storage"
   let node = Node.create n mtotal mnode mfree dtotal dfree ctotal cnos
-             (not live || drained) sptotal spfree gidx excl_stor
+             (not live || drained) sptotal spfree gidx excl_stor storage
   return (n, node)
 
 -- | Parses a group as found in the cluster group list.

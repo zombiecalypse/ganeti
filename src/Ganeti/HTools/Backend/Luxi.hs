@@ -218,7 +218,7 @@ getNodes ktg arr = extractArray arr >>= mapM (parseNode ktg)
 parseNode :: NameAssoc -> [(JSValue, JSValue)] -> Result (String, Node.Node)
 parseNode ktg [ name, mtotal, mnode, mfree, dtotal, dfree
               , ctotal, cnos, offline, drained, vm_capable, spindles, g_uuid
-              , tags, excl_stor, sptotal, spfree, cpu_speed ]
+              , tags, excl_stor, sptotal, spfree, cpu_speed, storage ]
     = do
   xname <- annotateResult "Parsing new node" (fromJValWithStatus name)
   let convert a = genericConvert "Node" xname a
@@ -245,11 +245,12 @@ parseNode ktg [ name, mtotal, mnode, mfree, dtotal, dfree
   xdfree <- lvconvert 0 "dfree" dfree
   xctotal <- lvconvert 0.0 "ctotal" ctotal
   xcnos <- lvconvert 0 "cnos" cnos
+  xstorage <- lvconvert Nothing "storage" storage
   let node = flip Node.setCpuSpeed xcpu_speed .
              flip Node.setNodeTags xtags $
              Node.create xname xmtotal xmnode xmfree xdtotal xdfree
              xctotal xcnos (not live || xdrained) xsptotal xspfree
-             xgdx xexcl_stor
+             xgdx xexcl_stor xstorage
   return (xname, node)
 
 parseNode _ v = fail ("Invalid node query result: " ++ show v)
